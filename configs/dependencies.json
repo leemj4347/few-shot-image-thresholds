@@ -1,0 +1,26 @@
+{
+  "fisch": {
+    "paper": "https://arxiv.org/abs/2102.08898",
+    "commit": "bcd18d1726541da827f7530a724460bd735bc0ed",
+    "files": [
+      {
+        "file": "mini_imagenet/quantile_snn.py",
+        "sha256": "79BFB1130D177393BFE5E2A01864442524DE2227E400EE0A93751AB45332D3F3"
+      },
+      {
+        "file": "meta_conformal/instance_cp.py",
+        "sha256": "F0CBF55AAAFEB425B9E640726828425A9BF410051CDB11EF4753EA4D21254F62"
+      },
+      {
+        "file": "README.md",
+        "sha256": "E28225A031726E5A8C8DE716B0ACB07B398135CA2087F5D2723B4143F0B78E85"
+      },
+      {
+        "file": "setup.py",
+        "sha256": "AC1F5EBD89C80C2688A5C1E547A6C00C627190ACC0CC4597694F880E484D8632"
+      }
+    ],
+    "repository": "https://github.com/ajfisch/few-shot-cp",
+    "download": "https://github.com/ajfisch/few-shot-cp/archive/bcd18d1726541da827f7530a724460bd735bc0ed.zip"
+  }
+}
