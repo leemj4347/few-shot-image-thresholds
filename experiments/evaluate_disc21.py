@@ -245,7 +245,7 @@ PROTOCOL = {
 }
 
 
-def main(args, out, holder):
+def main(args, out):
     S, MF, T, REG = C.modules()
     smoke = args.smoke
     ns = (100,) if smoke else NS
@@ -254,14 +254,7 @@ def main(args, out, holder):
     regseeds = REG_SEEDS[:3] if smoke else REG_SEEDS
     if not smoke and (out / "summary.csv").exists():
         raise RuntimeError("disc21 already completed; the result folder is kept")
-    p = C.Progress(
-        "disc21",
-        "DISC21 공식 ground truth 외부 시험",
-        {"prepare": 1, "registries": len(M_BASE) * len(regseeds), "aggregate": 1},
-        smoke,
-        args.log,
-    )
-    holder["progress"] = p
+
     fz = load_models(S, smoke, ns, alphas, seeds)
     C.atomic_json(
         out / "model_inputs.json",
@@ -278,7 +271,7 @@ def main(args, out, holder):
     Dz = design(F)
     C.atomic_json(out / "design_counts.json", {**Dz["counts"], "synthetic_features": F["synthetic"]})
     g = C.grid()
-    p.advance("prepare", **Dz["counts"])
+
     parts = C.output_path(out / "parts")
     parts.mkdir(parents=True, exist_ok=True)
     scores = C.output_path(out / "scores")
@@ -287,7 +280,7 @@ def main(args, out, holder):
         for rs in regseeds:
             pp = parts / f"M{M}_s{rs}.parquet"
             if pp.exists():
-                p.advance("registries", M=M, registry_seed=rs, skipped=True)
+
                 continue
             regs, sup, ev, pos = registry(Dz, M, rs)
             qidx = np.concatenate([sup, ev, pos])
@@ -332,7 +325,7 @@ def main(args, out, holder):
                 **{k: v.astype(np.float64) for k, v in keep.items()},
             )
             C.save_parquet(pd.DataFrame(rows), pp)
-            p.advance("registries", M=M, registry_seed=rs, positives=len(pos))
+
     R = pd.concat(
         [pd.read_parquet(parts / f"M{M}_s{rs}.parquet") for M in M_BASE for rs in regseeds],
         ignore_index=True,
@@ -378,7 +371,7 @@ def main(args, out, holder):
         "smoke": smoke,
         "synthetic_features": F["synthetic"],
     }
-    p.advance("aggregate")
+
     return {"dbp_pass": res["dbp_pass"], "sscd_pass": res["sscd_pass"], "smoke": smoke}
 if __name__ == "__main__":
     C.run_step("disc21", "DISC21 공식 ground truth 외부 시험", main)

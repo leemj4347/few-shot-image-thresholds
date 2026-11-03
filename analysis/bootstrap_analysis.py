@@ -11,35 +11,38 @@ KEY = ['domain', 'structure', 'kind', 'M', 'seed']
 COND = KEY[:-1]
 protocol = {'bootstrap_draws': B, 'rng_seed': RNG, 'alphas': [0.01, 0.05], 'n': [10, 20, 50, 100], 'methods': ['Meta set + np_global', 'Z-norm + NP rank'], 'metrics': ['V', 'FAR', 'TPR23', 'BA23', 'passing'], 'resampling': ['within_condition', 'shared_bundle'], 'selection_role': 'dev', 'bisection_iterations': 80}
 
-def progress(stage, **kw):
-    pass
 
 def source_sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
-sourcepaths = [RESULTS / 'main/summary.csv', RESULTS / 'support_baselines/summary.csv', RESULTS / 'support_baselines/rows_new_baselines.parquet', RESULTS / 'tasks/reference/invalid_tasks.json', RESULTS / 'tasks/reference/reference_manifest.json']
+sourcepaths = [RESULTS / 'main/summary.csv', RESULTS / 'support_baselines/summary.csv', RESULTS / 'support_baselines/rows_new_baselines.parquet']
 sourcehash = {str(p): source_sha(p) for p in sourcepaths}
-m = json.loads((RESULTS / 'tasks/reference/reference_manifest.json').read_text(encoding='utf-8-sig'))
-cache = task_cache(m)
-invalid = pd.DataFrame(json.loads((RESULTS / 'tasks/reference/invalid_tasks.json').read_text(encoding='utf-8-sig')))
-invalid['reason_group'] = invalid.reason.map(lambda x: 'insufficient_registry_pool' if x.startswith('registry:') else 'insufficient_normal_queries' if x.startswith('queries') else 'other')
-valid = []
-for p in sorted(cache.glob('*.complete.json')):
-    rec = json.loads(p.read_text(encoding='utf-8-sig'))
-    k = rec['key']
-    valid.append(dict(role=k[2], domain=k[3], structure=k[4], M=k[5], seed=k[6], scheme=k[1], stem=p.name.removesuffix('.complete.json')))
-valid = pd.DataFrame(valid)
-invalid_keys = set(invalid[['role', 'domain', 'structure', 'M', 'seed']].itertuples(index=False, name=None))
-valid = valid[[x not in invalid_keys for x in valid[['role', 'domain', 'structure', 'M', 'seed']].itertuples(index=False, name=None)]]
-assert len(valid) == 1628 and len(invalid) == 748
-invalid.to_csv(OUT / 'excluded_tasks_all.csv', index=False, encoding='utf-8-sig')
-invalid.groupby(['role', 'domain', 'structure', 'M', 'reason_group'], dropna=False).size().rename('excluded').reset_index().to_csv(OUT / 'excluded_reasons.csv', index=False, encoding='utf-8-sig')
-a = valid.groupby(['role', 'domain', 'structure', 'M']).size().rename('constructed')
-b = invalid.groupby(['role', 'domain', 'structure', 'M']).size().rename('excluded')
-flow = pd.concat([a, b], axis=1).fillna(0).astype(int).reset_index()
-flow['planned'] = flow.constructed + flow.excluded
-flow['exclusion_rate'] = flow.excluded / flow.planned
-flow.to_csv(OUT / 'task_flow.csv', index=False, encoding='utf-8-sig')
-assert flow.planned.sum() == 2376
+if (RESULTS / 'task_flow.csv').is_file():
+    flow = pd.read_csv(RESULTS / 'task_flow.csv')
+    assert flow.constructed.sum() == 1628 and flow.excluded.sum() == 748
+    flow.to_csv(OUT / 'task_flow.csv', index=False, encoding='utf-8-sig')
+else:
+    m = json.loads((RESULTS / 'tasks/reference/reference_manifest.json').read_text(encoding='utf-8-sig'))
+    cache = task_cache(m)
+    invalid = pd.DataFrame(json.loads((RESULTS / 'tasks/reference/invalid_tasks.json').read_text(encoding='utf-8-sig')))
+    invalid['reason_group'] = invalid.reason.map(lambda x: 'insufficient_registry_pool' if x.startswith('registry:') else 'insufficient_normal_queries' if x.startswith('queries') else 'other')
+    valid = []
+    for p in sorted(cache.glob('*.complete.json')):
+        rec = json.loads(p.read_text(encoding='utf-8-sig'))
+        k = rec['key']
+        valid.append(dict(role=k[2], domain=k[3], structure=k[4], M=k[5], seed=k[6], scheme=k[1], stem=p.name.removesuffix('.complete.json')))
+    valid = pd.DataFrame(valid)
+    invalid_keys = set(invalid[['role', 'domain', 'structure', 'M', 'seed']].itertuples(index=False, name=None))
+    valid = valid[[x not in invalid_keys for x in valid[['role', 'domain', 'structure', 'M', 'seed']].itertuples(index=False, name=None)]]
+    assert len(valid) == 1628 and len(invalid) == 748
+    invalid.to_csv(OUT / 'excluded_tasks_all.csv', index=False, encoding='utf-8-sig')
+    invalid.groupby(['role', 'domain', 'structure', 'M', 'reason_group'], dropna=False).size().rename('excluded').reset_index().to_csv(OUT / 'excluded_reasons.csv', index=False, encoding='utf-8-sig')
+    a = valid.groupby(['role', 'domain', 'structure', 'M']).size().rename('constructed')
+    b = invalid.groupby(['role', 'domain', 'structure', 'M']).size().rename('excluded')
+    flow = pd.concat([a, b], axis=1).fillna(0).astype(int).reset_index()
+    flow['planned'] = flow.constructed + flow.excluded
+    flow['exclusion_rate'] = flow.excluded / flow.planned
+    flow.to_csv(OUT / 'task_flow.csv', index=False, encoding='utf-8-sig')
+    assert flow.planned.sum() == 2376
 maincond = pd.read_csv(RESULTS / 'main/conditions.csv')
 zcond = pd.read_csv(RESULTS / 'support_baselines/conditions.csv')
 zcond = zcond[zcond.method == 'Z-norm + NP rank']
@@ -141,9 +144,8 @@ for n in [10, 20, 50, 100]:
             for j, k in enumerate(metrics):
                 lo, hi = np.percentile(dp[:, j] - dz[:, j], [2.5, 97.5])
                 diff.append(dict(n=n, alpha=alpha, scheme=scheme, metric=k, estimate=pp[j] - zz[j], ci_low=lo, ci_high=hi, draws=B))
-            progress('bootstrap', n=n, alpha=alpha, scheme=scheme)
+
 pd.DataFrame(pointrows).to_csv(OUT / 'point_estimates.csv', index=False, encoding='utf-8-sig')
 pd.DataFrame(ci).to_csv(OUT / 'conditional_intervals.csv', index=False, encoding='utf-8-sig')
 pd.DataFrame(diff).to_csv(OUT / 'paired_differences.csv', index=False, encoding='utf-8-sig')
 assert all((source_sha(Path(p)) == h for p, h in sourcehash.items()))
-progress('stored_analysis_complete')

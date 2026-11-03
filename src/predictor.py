@@ -14,6 +14,7 @@ import similarity as SIM, evaluate_registry as EV, criteria as CR
 from methods import registry_predictor as F1, conditional_predictor as F, calibration as FC
 torch.set_num_threads(1)
 CACHE = ROOT / "models"
+_CREATED_MODELS = set()
 
 
 def dump(p, d):
@@ -85,6 +86,8 @@ def model(mode, variant, alpha, seed, fit, dev, progress=None):
     path.mkdir(parents=True, exist_ok=True)
     pt = path / "model.pt"
     jp = path / "metadata.json"
+    if (pt.exists() or jp.exists()) and path.resolve() not in _CREATED_MODELS:
+        raise FileExistsError(f'Existing training output: {path}. Use a separate empty model directory.')
     if not (pt.is_file() and jp.is_file()):
         x, y, fitbs = arrays(fit, alpha, mode)
         xv, yv, devbs = arrays(dev, alpha, mode)
@@ -169,6 +172,7 @@ def model(mode, variant, alpha, seed, fit, dev, progress=None):
         )
         torch.save(obj.state_dict(), pt)
         dump(jp, md)
+        _CREATED_MODELS.add(path.resolve())
     md = json.loads(jp.read_text())
     torch.manual_seed(seed)
     obj = Predictor(mode, md["mu"], md["sd"], md["pool"])

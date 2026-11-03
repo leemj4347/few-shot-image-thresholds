@@ -14,16 +14,9 @@ def popcnt(x):
     return np.unpackbits(b, axis=-1).sum(-1).astype(np.int16)
 
 
-def main(args, out, holder):
+def main(args, out):
     S, MF, T, REG = C.modules()
-    p = C.Progress(
-        "data_overlap",
-        "역할 간 근사 중복 점검",
-        {"pools": 1, "chunks": CHUNKS, "aggregate": 1},
-        args.smoke,
-        args.log,
-    )
-    holder["progress"] = p
+
     _, m, cfg = S.X.reference_inputs(S.X.DEFAULT)
     root = Path(cfg["root"])
     table = T.load_role_table(m["role_table"])
@@ -38,7 +31,7 @@ def main(args, out, holder):
     D = pd.concat(parts, ignore_index=True)
     D = D.drop_duplicates(["pool", "file"]).reset_index(drop=True)
     if args.smoke: D = D.sample(min(len(D), 20000), random_state=0).reset_index(drop=True)
-    p.advance("pools", images=len(D))
+
     mid = D["mid"].to_numpy(np.uint64)
     high = D["high"].to_numpy(np.uint64)
     role = D.role.to_numpy()
@@ -63,7 +56,7 @@ def main(args, out, holder):
                     keep = x < y
                     acc.append(np.stack([x[keep], y[keep], dm[ii, jj][keep], dh[ii, jj][keep]], 1))
         n_so_far = int(sum(len(t) for t in acc))
-        p.advance("chunks", chunk=j + 1, candidate_rows=n_so_far)
+
     if acc:
         arr = np.concatenate(acc)
         code = arr[:, 0] * N + arr[:, 1]
@@ -88,7 +81,7 @@ def main(args, out, holder):
         for r in ("train", "dev", "test"):
             sel = np.r_[P.i[P.role_i == r].to_numpy(), P.j[P.role_j == r].to_numpy()]
             imgs[r] = int(len(np.unique(sel)))
-    p.advance("aggregate")
+
     return {"images": len(D), "cross_role_pairs": len(P), "identical_pairs": int(P.identical.sum()) if len(P) else 0,
             "images_involved_by_role": imgs, "r_bits": R_BITS}
 

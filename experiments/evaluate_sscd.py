@@ -71,25 +71,12 @@ def fixed_rules(dev, photo, smoke=False):
     )
 
 
-def main(args, out, holder):
+def main(args, out):
     S, MF, T, REG = C.modules()
     ns = (100,) if args.smoke else NS
     alphas = (0.05,) if args.smoke else ALPHAS
     seeds = C.SEEDS[:1] if args.smoke else C.SEEDS
-    p = C.Progress(
-        "sscd",
-        "SSCD 학습·보정·평가",
-        {
-            "tasks": 1,
-            "baselines": len(ns) * len(alphas),
-            "training": len(ns) * len(alphas) * len(seeds),
-            "evaluation": len(ns) * len(alphas) * len(seeds) * len(CALS),
-            "aggregate": 1,
-        },
-        args.smoke,
-        args.log,
-    )
-    holder["progress"] = p
+
     bundles = load_cache(
         T,
         C.output_path(C.OUT_ROOT / "data" / "sscd_tasks_smoke" if args.smoke else C.ROOT / "data" / "sscd_tasks"),
@@ -107,7 +94,7 @@ def main(args, out, holder):
     C.atomic_json(out / "fixed_thresholds.json", {"thresholds": fixed, **fixinfo})
     C.prepare_test(test, fixed["Equal error rate"], names)
     regs = [(b, k, d) for b in test for k, d in b.reg.items()]
-    p.advance("tasks")
+
     rows, info = ([], [])
     for n in ns:
         for a in alphas:
@@ -133,7 +120,7 @@ def main(args, out, holder):
                 taus["Z-norm + NP rank"] = C.cont_succ(z.mean() + c * max(z.std(), SD_FLOOR)) if np.isfinite(c) else float("inf")
                 for name, tau in taus.items():
                     rows.append(C.row(b, k, d, tau, n, a, name, names, scheme="sscd"))
-            p.advance("baselines", n=n, alpha=a)
+
     S.old_source = lambda *x: None
     for n in ns:
         S.CACHE = C.output_path((C.OUT_ROOT / "models_sscd_smoke" if args.smoke else C.ROOT / "models_sscd") / f"n{n}")
@@ -141,12 +128,12 @@ def main(args, out, holder):
         for a in alphas:
             for s in seeds:
                 obj, md, path = S.model(MODE, C.VAR[MODE], a, s, fit, dev, None)
-                p.advance("training", n=n, alpha=a, training_seed=s, best_epoch=md["best_epoch"])
+
                 for c in CALS:
                     if c.startswith("fisch") and len(cal) < S.FC.calibration_min_tasks(a):
                         if not args.smoke:
                             raise RuntimeError("too few calibration tasks")
-                        p.advance("evaluation", n=n, alpha=a, training_seed=s, calibration=c, skipped=True)
+
                         continue
                     ci = S.calibration(obj, MODE, a, cal, c)
                     lam = ci["global"]["Lambda"]
@@ -155,7 +142,7 @@ def main(args, out, holder):
                         q = S.predict(obj, d, a, MODE, b.domain)
                         tau = C.cont_succ(S.FC.corrected_boundary(q, lam))
                         rows.append(C.row(b, k, d, tau, n, a, f"Meta set + {c}", names, seed=s, scheme="sscd", q_pred=q, Lambda=lam))
-                    p.advance("evaluation", n=n, alpha=a, training_seed=s, calibration=c)
+
     R = pd.DataFrame(rows)
     C.save_parquet(R, out / "rows.parquet")
     C.atomic_json(out / "calibration.json", info)
@@ -179,7 +166,7 @@ def main(args, out, holder):
                 fixed_far_ok=others,
                 judgment="PASS" if all((me > v for v in others.values())) else "NON PASS",
             ))
-    p.advance("aggregate")
+
     return {"judgment": j}
 if __name__ == "__main__":
     C.run_step("sscd", "SSCD 학습·보정·평가", main)

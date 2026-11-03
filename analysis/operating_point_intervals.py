@@ -13,8 +13,6 @@ ci = []
 diff = []
 pointrows = []
 
-def progress(stage, **kw):
-    pass
 
 R = pd.read_parquet(OUT / 'development_adjusted_rows.parquet')
 selection = OUT / 'development_selection.csv'
@@ -91,11 +89,11 @@ for n in [10, 20, 50, 100]:
             for method, point, draw in [('Meta set + np_global', pp, dp), ('Z-norm + NP rank', zz, dz)]:
                 for j, k in enumerate(metrics):
                     lo, hi = np.percentile(draw[:, j], [2.5, 97.5])
-                    ci.append(dict(n=n, alpha=alpha, method=method, metric=k, estimate=point[j], ci_low=lo, ci_high=hi, draws=B))
+                    ci.append(dict(n=n, alpha=alpha, scheme=scheme, method=method, metric=k, estimate=point[j], ci_low=lo, ci_high=hi, draws=B))
             for j, k in enumerate(metrics):
                 lo, hi = np.percentile(dp[:, j] - dz[:, j], [2.5, 97.5])
-                diff.append(dict(n=n, alpha=alpha, metric=k, estimate=pp[j] - zz[j], ci_low=lo, ci_high=hi, draws=B))
-            progress('bootstrap', n=n, alpha=alpha)
+                diff.append(dict(n=n, alpha=alpha, scheme=scheme, metric=k, estimate=pp[j] - zz[j], ci_low=lo, ci_high=hi, draws=B))
+
 pd.DataFrame(pointrows).to_csv(OUT / 'development_fixed_point_estimates.csv', index=False, encoding='utf-8-sig')
 pd.DataFrame(ci).to_csv(OUT / 'development_fixed_intervals.csv', index=False, encoding='utf-8-sig')
 pd.DataFrame(diff).to_csv(OUT / 'development_fixed_paired_differences.csv', index=False, encoding='utf-8-sig')

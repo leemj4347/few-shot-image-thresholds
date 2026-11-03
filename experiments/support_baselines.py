@@ -46,20 +46,19 @@ def gpd_boundary(z, alpha):
     return float(q), "ok"
 
 
-def main(args, out, holder):
+def main(args, out):
     ns = (10, 100) if args.smoke else NS
     seeds = C.SEEDS[:1] if args.smoke else C.SEEDS
     units = {"tasks": 1, "pooled": len(ALPHAS), "per_n": len(ns) * len(ALPHAS) * 2, "crc": len(ns) * len(ALPHAS) * len(seeds),
              "aggregate": 1}
-    p = C.Progress("support_baselines", "적은 서포트용 기준선", units, args.smoke, args.log)
-    holder["progress"] = p
-    S, m, cfg, fit, cal, dev, test = C.load_reference(p)
+
+    S, m, cfg, fit, cal, dev, test = C.load_reference(None)
     names = S.CR.variant_names()
     g = C.grid()
     C.prepare_test(test, S.SIM.grid_ceil(.63075), names)
     regs = [(b, k, d) for b in test for k, d in b.reg.items()]
     if args.smoke: regs = regs[:80]
-    p.advance("tasks")
+
     floor = float(np.min(np.diff(g)))
     rows, info = [], []
 
@@ -73,7 +72,7 @@ def main(args, out, holder):
             pooled[(a, M)] = np_threshold(zM, a, g)
         info.append(dict(method="Pooled NP", alpha=a, global_tau=pooled[(a, "global")][0], global_rank=pooled[(a, "global")][1],
                          pooled_scores=int(len(allz)), by_M={str(M): pooled[(a, M)][0] for M in fitM}))
-        p.advance("pooled", alpha=a)
+
     near = lambda M: min(fitM, key=lambda x: (abs(math.log10(x) - math.log10(M)), -x))
     for n in ns:
         for a in ALPHAS:
@@ -83,7 +82,7 @@ def main(args, out, holder):
                                   pooled_M=near(int(d["M"]))))
                 bd, status = gpd_boundary(np.asarray(d["Z_sup"], float)[:n], a)
                 rows.append(C.row(b, k, d, C.succ(bd, g), n, a, "GPD tail (support)", names, fit_status=status))
-            p.advance("per_n", n=n, alpha=a, method="pooled/GPD")
+
 
             t = []
             for b in cal:
@@ -102,7 +101,7 @@ def main(args, out, holder):
                 sd = max(z.std(), floor)
                 rows.append(C.row(b, k, d, C.succ(mu + c * sd, g) if np.isfinite(c) else float("inf"), n, a,
                                   "Z-norm + NP rank", names))
-            p.advance("per_n", n=n, alpha=a, method="Z-norm")
+
 
             for s in seeds:
                 obj, md, path = C.load_model(S, n, MODE, a, s)
@@ -134,7 +133,7 @@ def main(args, out, holder):
                     q = look[(b.domain, b.structure, k, int(b.M), int(b.seed))]
                     rows.append(C.row(b, k, d, C.succ(q + lam, g) if np.isfinite(lam) else float("inf"), n, a,
                                       "CRC same predictor", names, seed=s, q_pred=q, Lambda=lam))
-                p.advance("crc", n=n, alpha=a, training_seed=s)
+
     R = pd.DataFrame(rows)
     C.save_parquet(R, out / "rows_new_baselines.parquet")
     C.atomic_json(out / "fitted_values.json", info)
@@ -164,7 +163,7 @@ def main(args, out, holder):
     C.save_csv(summ, out / "summary.csv")
     gs = R[R.method == "GPD tail (support)"].groupby(["n", "alpha"]).fit_status.value_counts().unstack(fill_value=0)
     gs.to_csv(C.output_path(out / "gpd_fit_status.csv"), encoding="utf-8-sig")
-    p.advance("aggregate")
+
     return {"methods_new": sorted(R.method.unique()), "n": list(ns), "alphas": list(ALPHAS)}
 
 

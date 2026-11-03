@@ -25,7 +25,7 @@ def config_path():
     return p
 
 
-def main(args, out, holder):
+def main(args, out):
     cfgp = config_path()
     cfg = json.loads(cfgp.read_text(encoding="utf-8"))
     role = C.ROOT / "data" / "hashes" / "role_table.csv"

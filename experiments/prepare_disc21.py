@@ -55,7 +55,7 @@ class FeatStore:
 # read_bytes(i) -> bytes; decode + DBpHash + SSCD preprocessing in threads, SSCD batches on the model device
 def run_store(name, st, read_bytes, D, HC, model, p, ex):
     todo = np.flatnonzero(~st.done)
-    p.advance(name, int(st.done.sum()), resumed=int(st.done.sum()))
+
 
     def prep(buf):
         img = C.load_bgr_bytes(buf) if buf is not None else None
@@ -82,14 +82,14 @@ def run_store(name, st, read_bytes, D, HC, model, p, ex):
                 bad += 1
                 st.ok[i] = False
             st.done[i] = True
-        p.advance(name, len(ix), last=str(st.index.name.iat[int(ix[-1])]), unreadable=bad)
+
         if k % 20 == 0:
             st.save()
     st.save()
     return bad
 
 
-def main(args, out, holder):
+def main(args, out):
     D, HC, _ = C.runtime_modules()
     info = json.loads((C.WEIGHTS.parent / "weights_info.json").read_text(encoding="utf-8"))
     refs = [Path(s.strip()).stem for s in VAL_LIST.read_text(encoding="utf-8").splitlines() if s.strip()]
@@ -101,14 +101,7 @@ def main(args, out, holder):
     if args.smoke:
         refs, qnames = (refs[:20], qnames[:20])
     base = C.OUT_ROOT / "data" / "disc21_features_smoke" if args.smoke else C.ROOT / "data" / "disc21_features"
-    p = C.Progress(
-        "disc21_prepare",
-        "DISC21 외부 시험 특징(해시·SSCD)",
-        {"references": len(refs), "queries": len(qnames), "check": 1},
-        args.smoke,
-        args.log,
-    )
-    holder["progress"] = p
+
     model = C.sscd_load()
     rs = FeatStore(base / "references", refs, info["dim"])
     qs = FeatStore(base / "queries", qnames, info["dim"])
@@ -121,8 +114,8 @@ def main(args, out, holder):
             return None
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=int(os.environ.get("WORKERS", "0")) or max(2, int((os.cpu_count() or 4) * 0.7))) as ex:
-        run_store("references", rs, ref_bytes, D, HC, model, p, ex)
-        run_store("queries", qs, lambda i: zf.read(members[qs.index.name.iat[i]]), D, HC, model, p, ex)
+        run_store("references", rs, ref_bytes, D, HC, model, None, ex)
+        run_store("queries", qs, lambda i: zf.read(members[qs.index.name.iat[i]]), D, HC, model, None, ex)
     zf.close()
     return {"unreadable_references": int((~rs.ok).sum()),
             "unreadable_queries": int((~qs.ok).sum())}

@@ -18,21 +18,14 @@ def curves(d, g, names):
     return (far, tpr / len(names))
 
 
-def main(args, out, holder):
+def main(args, out):
     S, MF, T, REG = C.modules()
     names = S.CR.variant_names()
     alphas = (0.01, 0.05) if args.smoke else ALPHAS
     ns = (100,) if args.smoke else NS
-    p = C.Progress(
-        "hash_thresholds",
-        "Hamming 관행값과 FAR 예산",
-        {"tasks": 1, "hash_rule": len(alphas), "reference": len(alphas), "methods": len(alphas) * len(ns), "curves": 1},
-        args.smoke,
-        args.log,
-    )
-    holder["progress"] = p
-    S, m, cfg, fit, cal, dev, test = C.load_reference(p)
-    p.advance("tasks")
+
+    S, m, cfg, fit, cal, dev, test = C.load_reference(None)
+
     g = C.grid()
     tau_dbp = S.SIM.grid_ceil(0.63075)
     C.prepare_test(test, tau_dbp, names)
@@ -46,7 +39,7 @@ def main(args, out, holder):
         for b, k, d in regs:
             for n in ns:
                 hrows.append(C.row(b, k, d, tau_h, n, a, "Hash convention (10 bits)", names))
-        p.advance("hash_rule", alpha=a)
+
     H = pd.DataFrame(hrows)
     C.save_parquet(H, out / "hash_convention_rows.parquet")
     hc = C.condition_table(H)
@@ -67,7 +60,7 @@ def main(args, out, holder):
                 FAR_ref=r["FAR"],
                 TPR_ref=r["TPR23"],
             ))
-        p.advance("reference", alpha=a)
+
     R = pd.DataFrame(ref)
     C.save_csv(R, out / "reference_point.csv")
     allrows = []
@@ -79,7 +72,7 @@ def main(args, out, holder):
             A["FAR_over_alpha"] = A.FAR / a
             A["TPR_gap"] = np.where(A.violation, np.nan, A.TPR_ref - A.TPR23)
             allrows.append(A)
-            p.advance("methods", n=n, alpha=a)
+
     A = pd.concat(allrows, ignore_index=True)
     keep = C.K + [
         "seed",
@@ -104,7 +97,7 @@ def main(args, out, holder):
     C.save_csv(s, out / "summary_budget.csv")
     cond = C.condition_table(A.drop(columns=["tau_eval_min", "FAR_ref", "TPR_ref", "FAR_over_alpha", "TPR_gap"]))
     C.save_csv(C.method_summary(cond), out / "summary_pass_counts.csv")
-    p.stage("curves")
+
     fr = []
     for b, k, d in regs:
         far, tpr = curves(d, g, names)
@@ -117,7 +110,7 @@ def main(args, out, holder):
     C.save_csv(curve, out / "frontier_curve.csv")
     pts = s[s.n == 100][["method", "alpha", "FAR", "TPR23", "V"]]
     C.save_csv(pts, out / "operating_points_n100.csv")
-    p.advance("curves")
+
     hs = hc[hc.n == 100].groupby("alpha").meets.sum().to_dict()
     return {
         "hash_convention_tau": tau_h,

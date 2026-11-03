@@ -55,7 +55,7 @@ def prep_file(f, ix, I, root, D, HC, TR, v3names):
     return (f, out)
 
 
-def main(args, out, holder):
+def main(args, out):
     from concurrent.futures import ThreadPoolExecutor
     D, HC, TR = C.runtime_modules()
     info = json.loads((C.WEIGHTS.parent / "weights_info.json").read_text(encoding="utf-8"))
@@ -64,8 +64,7 @@ def main(args, out, holder):
     if args.smoke:
         keep = sorted(idxs["nft"].file.unique())[:20]
         idxs["nft"] = idxs["nft"][idxs["nft"].file.isin(keep)].reset_index(drop=True)
-    p = C.Progress("sscd_embeddings", "SSCD 임베딩(원본·편집 재생성)", {n: len(i) for n, i in idxs.items()}, args.smoke, args.log)
-    holder["progress"] = p
+
     model = C.sscd_load()
     rt = C.sscd_runtime_info()
     v3names = set(TR.BY_NAME)
@@ -78,7 +77,7 @@ def main(args, out, holder):
             I = st.index
             root = C.ROOTS[name]
             todo_files = list(I.file[~st.done].unique())
-            p.advance(name, int(st.done.sum()), pool=name, resumed=int(st.done.sum()), device=rt["device"])
+
             mism = {"orig": 0, "variant": 0, "checked": 0, "unreadable": 0, "by_variant": {}}
             rows_by_file = {f: g.index.to_numpy() for f, g in I.groupby("file")}
             rounds = [todo_files[k:k + FILES_PER_ROUND] for k in range(0, len(todo_files), FILES_PER_ROUND)]
@@ -96,16 +95,7 @@ def main(args, out, holder):
                     if not ok:
                         mism["orig" if vname == "orig" else "variant"] += 1
                         mism["by_variant"][vname] = mism["by_variant"].get(vname, 0) + 1
-                p.advance(
-                    name,
-                    len(items),
-                    pool=name,
-                    file=done_now[-1][0],
-                    mismatched_orig=mism["orig"],
-                    mismatched_variant=mism["variant"],
-                    checked=mism["checked"],
-                    device=rt["device"],
-                )
+
                 if k % 10 == 0:
                     st.save_done()
             st.save_done()

@@ -10,7 +10,7 @@ from scipy.stats import beta as beta_dist, binomtest
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import similarity as SIM
-import progress as RP
+
 import criteria as CR
 import evaluate_registry as EV
 import tasks as T
@@ -59,7 +59,7 @@ def build_bundles(cfg: dict, root: Path, role_table: dict, scheme: str, log=prin
     if invalid is None: invalid = []
     pools, variants = {}, {}
     for pool_index, (name, p) in enumerate(cfg["pools"].items(), 1):
-        RP.update("pool_load", scheme=scheme, pool=name, completed=pool_index-1, total=len(cfg["pools"]))
+
         pools[name] = Pool(root / p["cache"], name=name, scheme=scheme)
         frames = []
         for key in ("variants", "variants2"):
@@ -70,7 +70,7 @@ def build_bundles(cfg: dict, root: Path, role_table: dict, scheme: str, log=prin
                 v = pd.read_parquet(root / rel)
                 frames.append(v[v.ok & (v.variant != "orig")])
         if frames: variants[name] = pd.concat(frames, ignore_index=True)
-        RP.update("pool_load", scheme=scheme, pool=name, completed=pool_index, total=len(cfg["pools"]))
+
     out = []
     for dom, d in cfg["domains"].items():
         names = d["pools"]
@@ -93,13 +93,11 @@ def build_bundles(cfg: dict, root: Path, role_table: dict, scheme: str, log=prin
             for struct in structures:
                 for M in M_list:
                     for seed in cfg["seeds"]:
-                        RP.update("task_build", scheme=scheme, domain=dom, role=role, M=int(M), seed=int(seed),
-                                  completed=done_jobs, total=total_jobs, invalid=invalid_jobs, task_status="started")
+
                         b = T.build_bundle(rp, var, role, dom, struct, M, seed, cfg)
                         done_jobs+=1
                         if b.note:invalid_jobs+=1
-                        RP.update("task_build", scheme=scheme, domain=dom, role=role, M=int(M), seed=int(seed),
-                                  completed=done_jobs, total=total_jobs, invalid=invalid_jobs, task_status="finished")
+
                         if b.note:
                             invalid.append({"role": role, "domain": dom, "structure": struct,
                                             "M": int(M), "seed": int(seed), "reason": b.note})
@@ -130,7 +128,7 @@ def score_all(bundles: list, cfg: dict, scheme: str, included: dict | None, log=
     if not byrole["test"]:
         raise ValueError("no test-role tasks in the bundle set")
     dev = byrole["dev"]
-    RP.update("baselines", scheme=scheme, dev_bundles=len(dev), step="fixed_and_domain")
+
     d0, gen = MF.dev_pair_scores(dev) if dev else (None, np.zeros(0))
     fixed_taus = {}
     if dev:
@@ -142,7 +140,7 @@ def score_all(bundles: list, cfg: dict, scheme: str, included: dict | None, log=
     fixed_taus["해밍 관행값"] = MF.fit_C0h(w)
     dom_taus = {dom: MF.fit_C1(dev, dom) for dom in cfg["domains"]} if dev else {}
 
-    RP.update("baselines", scheme=scheme, dev_bundles=len(dev), step="development_lookup_table")
+
     devfit = MD.fit(dev, alphas, w) if dev else None
 
     info = {"fixed_taus": {k: (None if not np.isfinite(v) else float(v)) for k, v in fixed_taus.items()}}
@@ -163,12 +161,11 @@ def score_all(bundles: list, cfg: dict, scheme: str, included: dict | None, log=
                      f"메타훈련 태스크 {len(byrole['train'])}개, 분할 {cfg.get('cal_frac', 0.7)}.\n"
                      "시드 수나 메타훈련 M 격자를 늘리거나 분할 비율을 바꿀 것. "
                      "Λ 보정의 하한은 alpha=0.05에서 19개, alpha=0.01에서 99개이며 여유를 두어야 한다.")
-        RP.update("train", scheme=scheme, fit_tasks=len(fitb), cal_tasks=len(calb), completed=0,
-                  total=int(cfg.get("control_epochs", MS.EPOCHS)))
+
         model, minfo = MS.fit(fitb, alphas, n_list, seed=cfg.get("control_seed", 0),
                               hidden=cfg.get("control_hidden", MS.HIDDEN), epochs=cfg.get("control_epochs", MS.EPOCHS),
-                              progress=lambda epoch,total,loss:RP.update("train", scheme=scheme, completed=epoch,
-                                                                        total=total,last_batch_mse=loss))
+                              progress=None)
+
         info["control_model"] = minfo
         info["control_tasks"] = {"fit": len(fitb), "cal": len(calb)}
         if model is not None:
@@ -176,18 +173,16 @@ def score_all(bundles: list, cfg: dict, scheme: str, included: dict | None, log=
             cal_total=len(alphas)*len(n_list)
             for a in alphas:
                 for n in n_list:
-                    RP.update("calibrate", scheme=scheme, alpha=float(a), n=int(n), completed=cal_done,total=cal_total)
+
                     lam[(a, n)] = MS.calibrate(model, calb, a, n)
                     cal_done+=1
-                    RP.update("calibrate", scheme=scheme, alpha=float(a), n=int(n), completed=cal_done,total=cal_total,
-                              constraint_verified=bool(lam[(a,n)].get("constraint_verified",False)))
+
             info["Lambda"] = {f"alpha={a},n={n}": v for (a, n), v in lam.items()}
         log(f"  대조군: {minfo}")
 
     rows = []
     for test_index,b in enumerate(byrole["test"],1):
-        RP.update("evaluate", scheme=scheme, domain=b.domain, M=int(b.M), seed=int(b.seed),
-                  completed=test_index-1,total=len(byrole["test"]),rows=len(rows))
+
         for kind, d in b.reg.items():
             if len(d["Z_eval"]) == 0: continue
             M_eff = d["M"]
@@ -236,8 +231,7 @@ def score_all(bundles: list, cfg: dict, scheme: str, included: dict | None, log=
                             r["TPR_included_n"] = n_inc
                             r["TPR_included_missing"] = n_miss
                         rows.append(r)
-        RP.update("evaluate", scheme=scheme, domain=b.domain, M=int(b.M), seed=int(b.seed),
-                  completed=test_index,total=len(byrole["test"]),rows=len(rows))
+
     return pd.DataFrame(rows), info
 
 
@@ -416,4 +410,3 @@ def gate(cond: pd.DataFrame, kinds=("base", "grow_i", "grow_ii")) -> dict:
                                      "baseline_BA": None if not np.isfinite(best.baseline_BA23) else float(best.baseline_BA23),
                                      "n_tasks": int(best.n_tasks), "tasks_enough": bool(best.tasks_enough)})
     return out
-

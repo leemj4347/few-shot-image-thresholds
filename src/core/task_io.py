@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(HERE / "scripts"))
 import tasks as T
 import criteria as CR
 import evaluate_registry as EV

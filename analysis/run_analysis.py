@@ -9,11 +9,13 @@ CODE = Path(__file__).resolve().parent
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', required=True)
+    parser.add_argument('--data')
     parser.add_argument('--experiment-python', required=True)
     args = parser.parse_args()
     output = Path(args.output).resolve()
-    if ROOT / 'runs' not in output.parents:
-        raise ValueError('output must be inside runs/')
+    if args.data:
+        subprocess.run([args.experiment_python, CODE / 'recalculate.py', '--data', args.data, '--output', output], cwd=ROOT, check=True)
+        return
     output.mkdir(parents=True, exist_ok=False)
     (output / 'supplement').mkdir()
     env = os.environ.copy()

@@ -9,13 +9,11 @@ MODE = "base_set"
 N = 100
 
 
-def main(args, out, holder):
+def main(args, out):
     seeds = C.SEEDS[:1] if args.smoke else C.SEEDS
-    p = C.Progress("residuals", "잔차 분포와 교환가능성 점검", {"tasks": 1, "models": len(ALPHAS) * len(seeds), "aggregate": 1},
-                   args.smoke, args.log)
-    holder["progress"] = p
-    S, m, cfg, fit, cal, dev, test = C.load_reference(p)
-    p.advance("tasks")
+
+    S, m, cfg, fit, cal, dev, test = C.load_reference(None)
+
     cal_rows, test_rows, lam_rows = [], [], []
     for a in ALPHAS:
         arms = {s: pd.read_parquet(C.arm_path(N, round(1 - a, 2), MODE, s, "np_global")) for s in seeds}
@@ -45,7 +43,7 @@ def main(args, out, holder):
                                           M=int(b.M), seed=int(b.seed), q_pred=float(h.q_pred), q_target=t,
                                           residual=t - float(h.q_pred), Lambda=float(h.Lambda),
                                           violation=bool(h.violation), FAR=float(h.FAR)))
-            p.advance("models", alpha=a, training_seed=s)
+
     CR = pd.DataFrame(cal_rows)
     TR = pd.DataFrame(test_rows)
     LR = pd.DataFrame(lam_rows)
@@ -65,7 +63,7 @@ def main(args, out, holder):
     C.save_csv(G, out / "residual_by_domain_kind.csv")
     incl = TR[TR.exceeds_lambda == False]
 
-    p.advance("aggregate")
+
     return {"lambda_matches_stored": bool(LR.match.all()),
             "inclusion_check_violations_when_r_le_lambda": int(incl.violation.sum())}
 

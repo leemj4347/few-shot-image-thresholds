@@ -72,12 +72,10 @@ def stats_from(mats, base, conds, task_idx=None, seed_idx=None):
     return out
 
 
-def main(args, out, holder):
+def main(args, out):
     B = 200 if args.smoke else args.bootstrap
     ns = (100,) if args.smoke else NS
-    p = C.Progress("statistics", "신뢰구간·이항 상한·짝 검정", {"bootstrap": len(ns) * len(ALPHAS) * B,
-                   "binomial": len(ns) * len(ALPHAS), "tests": len(ns) * len(ALPHAS)}, args.smoke, args.log)
-    holder["progress"] = p
+
     rng = np.random.default_rng(20261016)
     ci_rows, diff_rows, cp_rows, test_rows = [], [], [], []
     for n in ns:
@@ -95,7 +93,7 @@ def main(args, out, holder):
                 for m, x in mats.items():
                     r = stats_from(x, base, conds, tix, six)
                     for k in r: draws[m][k][b0:b0 + bb] = r[k]
-                p.advance("bootstrap", bb, n=n, alpha=a, draws=b0 + bb, of=B)
+
             for m in mats:
                 for k in ["V", "FAR", "TPR23", "BA23", "passing"]:
                     lo, hi = np.percentile(draws[m][k], [2.5, 97.5])
@@ -119,7 +117,7 @@ def main(args, out, holder):
                                     ub95_median=float(np.median(ub)) if len(ub) else np.nan,
                                     ub95_max=float(np.max(ub)) if len(ub) else np.nan,
                                     share_ub_le_alpha=float(np.mean(ub <= a)) if len(ub) else np.nan))
-            p.advance("binomial", n=n, alpha=a)
+
 
             if PROPOSED in mats:
                 for cmp in COMPARE:
@@ -133,7 +131,7 @@ def main(args, out, holder):
                         test_rows.append(dict(n=n, alpha=a, comparison=f"{PROPOSED} vs {cmp}", metric=k,
                                               mean_difference=float(d.mean()), nonzero_pairs=nz, registries=len(d),
                                               test="Wilcoxon signed-rank, two-sided", p_value=pv))
-            p.advance("tests", n=n, alpha=a)
+
     T = pd.DataFrame(test_rows)
     if len(T):
         ok = T.p_value.notna()

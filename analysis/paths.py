@@ -6,8 +6,6 @@ RESULTS = Path(os.environ.get("EXPERIMENT_RESULTS", str(ROOT / "results"))).reso
 
 def output_root():
     p = Path(os.environ["ANALYSIS_OUTPUT"]).resolve()
-    if ROOT / "runs" not in p.parents:
-        raise ValueError("output must be inside runs/")
     p.mkdir(parents=True, exist_ok=True)
     return p
 

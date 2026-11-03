@@ -12,8 +12,6 @@ floor = float(np.min(np.diff(g)))
 manifest = json.loads((RESULTS / 'tasks/reference/reference_manifest.json').read_text(encoding='utf-8-sig'))
 cache = task_cache(manifest)
 
-def progress(stage, **kw):
-    pass
 
 records = {'dev': [], 'test': []}
 for meta_path in sorted(cache.glob('*.npz.json')):
@@ -32,7 +30,7 @@ for meta_path in sorted(cache.glob('*.npz.json')):
                 d['_sorted_positive'] = {name: np.sort(zp[pv == name]) for name in names}
             records[role].append(d)
 assert len(records['dev']) == 568 and len(records['test']) == 1016
-progress('loaded_tasks', development=len(records['dev']), test=len(records['test']))
+
 fitted = json.loads((RESULTS / 'support_baselines/fitted_values.json').read_text(encoding='utf-8-sig'))
 Z = pd.read_parquet(RESULTS / 'support_baselines/rows_new_baselines.parquet')
 Z = Z[Z.method == 'Z-norm + NP rank']
@@ -106,7 +104,7 @@ for n in [10, 20, 50, 100]:
                     original = zlook[key(d)]
                     rr.update(domain=d['domain'], structure=d['structure'], kind=d['kind'], M=d['M_base'], M_eff=d['M'], seed=d['seed'], n=n, alpha=alpha, method=method, training_seed=seed, development_constraint=target_metric, shift=shift, baseline_BA23=original['baseline_BA23'])
                     all_rows.append(rr)
-            progress('development_selected', n=n, alpha=alpha, method=method, training_seed=seed)
+
 R = pd.DataFrame(all_rows)
 R.to_parquet(OUT / 'development_adjusted_rows.parquet', index=False)
 keys = ['n', 'alpha', 'method', 'training_seed', 'development_constraint', 'domain', 'structure', 'kind', 'M']
@@ -117,4 +115,3 @@ PS = G.groupby(['n', 'alpha', 'method', 'training_seed', 'development_constraint
 PS.to_csv(OUT / 'development_adjusted_by_seed.csv', index=False, encoding='utf-8-sig')
 PS.groupby(['n', 'alpha', 'method', 'development_constraint'])[['V', 'FAR', 'TPR23', 'BA23', 'passing']].mean().reset_index().to_csv(OUT / 'development_adjusted_summary.csv', index=False, encoding='utf-8-sig')
 pd.DataFrame(selection).to_csv(OUT / 'development_selection.csv', index=False, encoding='utf-8-sig')
-progress('development_comparison_complete', rows=len(R))

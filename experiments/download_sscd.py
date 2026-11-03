@@ -5,16 +5,15 @@ import numpy as np
 import experiment as C
 
 
-def main(args, out, holder):
-    p = C.Progress("sscd_download", "SSCD 가중치 받기·확인", {"download": 1, "check": 1}, args.smoke, args.log)
-    holder["progress"] = p
+def main(args, out):
+
     C.WEIGHTS.parent.mkdir(parents=True, exist_ok=True)
     src = "existing file"
     if not C.WEIGHTS.exists():
         last = None
         for url in C.WEIGHT_URLS:
             try:
-                p.stage("download", url=url)
+
                 tmp = C.output_path(C.WEIGHTS.with_suffix(".part"))
                 with urllib.request.urlopen(url, timeout=120) as r, open(tmp, "wb") as f: shutil.copyfileobj(r, f, 1 << 20)
                 tmp.replace(C.WEIGHTS)
@@ -23,7 +22,7 @@ def main(args, out, holder):
             except Exception as e:
                 last = e
         if not C.WEIGHTS.exists(): raise RuntimeError(f"download failed from all sources: {last!r}")
-    p.advance("download", source=src)
+
     digest = C.sha256(C.WEIGHTS)
     model = C.sscd_load()
     img = (np.random.default_rng(0).random((300, 400, 3)) * 255).astype(np.uint8)
@@ -38,7 +37,7 @@ def main(args, out, holder):
 
     canonical = C.WEIGHTS.parent / "weights_info.json"
     if C.RUN_ROOT is None or not canonical.exists(): C.atomic_json(canonical, info)
-    p.advance("check", dim=info["dim"], device=rt["device"])
+
     return info
 
 

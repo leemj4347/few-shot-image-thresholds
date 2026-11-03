@@ -115,7 +115,7 @@ def prepare(S, p, out):
     return (fit, cal, dev, test, fixed)
 
 
-def main(args, out, holder):
+def main(args, out):
     S = C.runner()
     S.encode = encode(S)
     ns = (100,) if args.smoke else NS
@@ -125,23 +125,9 @@ def main(args, out, holder):
     arms = C.output_path(out / "arms") if args.smoke else C.ARMS
     sel_jobs = [(b, v) for b in ((0.95,) if args.smoke else BETAS) for v in (("normalized15",) if args.smoke else ("raw15", "normalized15"))]
     mroot = C.OUT_ROOT / "models_smoke" if args.smoke else C.ROOT / "models"
-    p = C.Progress(
-        "main",
-        "본 실험 학습·보정·평가",
-        {
-            "tasks": 1,
-            "selection_check": len(sel_jobs),
-            "baselines": len(ns) * len(betas),
-            "training": len(ns) * len(betas) * len(modes) * len(seeds),
-            "evaluation": len(ns) * len(betas) * len(modes) * len(seeds) * len(CAL),
-            "aggregate": 1,
-        },
-        args.smoke,
-        args.log,
-    )
-    holder["progress"] = p
-    fit, cal, dev, test, fixed = prepare(S, p, out)
-    p.advance("tasks", fixed_gamma=fixed["DBpHash fixed"], youden=fixed["Youden J"], otsu=fixed["Otsu"])
+
+    fit, cal, dev, test, fixed = prepare(S, None, out)
+
     sel = []
     STATE["N"] = 100
     S.CACHE = C.output_path(mroot / "selection_check")
@@ -149,7 +135,7 @@ def main(args, out, holder):
         a = round(1 - beta, 2)
         _, md, _ = S.model("base_set", v, a, 42, fit, dev)
         sel.append(dict(alpha=a, variant=v, development_mse=md["development_mse"]))
-        p.advance("selection_check", alpha=a, variant=v)
+
     sd = pd.DataFrame(sel)
     C.save_csv(sd, out / "selection_check.csv")
     choice = {str(a): g.sort_values("development_mse").variant.iloc[0] for a, g in sd.groupby("alpha")} if len(sd) else {}
@@ -179,26 +165,27 @@ def main(args, out, holder):
                     arms / (token + ".metadata.json"),
                     dict(n=n, beta=beta, boundary_case=False, cp_rank=rank, np_rank=k),
                 )
-                p.advance("baselines", n=n, beta=beta)
+
             else:
-                p.advance("baselines", skipped=True, n=n, beta=beta)
+
+                pass
             for mode in modes:
                 for s in seeds:
                     tok = f"n{n}_{tag}_{mode}_s{s}"
                     if all(arm_complete(arms, f"{tok}_{c}") for c in CAL):
-                        p.advance("training", skipped=True)
-                        p.advance("evaluation", len(CAL), skipped=True)
+
+
                         continue
                     t0 = time.perf_counter()
                     obj, md, path = S.model(mode, C.VAR[mode], a, s, fit, dev)
                     if md["epochs"] != 15 or md["pool"] != "mean" or md.get("reused"):
                         raise ValueError("stored model settings differ (epochs, pool or reused)")
-                    p.advance("training", n=n, beta=beta, model=mode, training_seed=s, best_epoch=md["best_epoch"])
+
                     tt = time.perf_counter() - t0
                     for c in CAL:
                         arm = f"{tok}_{c}"
                         if arm_complete(arms, arm):
-                            p.advance("evaluation", skipped=True)
+
                             continue
                         corr = S.calibration(obj, mode, a, cal, c)
                         lam = corr["global"]["Lambda"]
@@ -228,7 +215,7 @@ def main(args, out, holder):
                                 timing={"training_s": tt},
                             ),
                         )
-                        p.advance("evaluation", n=n, beta=beta, model=mode, training_seed=s, calibration=c)
+
     expected = []
     for n in ns:
         for beta in betas:
@@ -244,7 +231,7 @@ def main(args, out, holder):
     C.save_csv(d, out / "conditions.csv")
     summ = C.method_summary(d.assign(training_seed=d.training_seed.fillna(-1)))
     C.save_csv(summ, out / "summary.csv")
-    p.advance("aggregate")
+
     return {"conditions": int(len(d)), "fixed_thresholds": fixed, "selection_lower_dev_mse": choice}
 if __name__ == "__main__":
     C.run_step("main", "본 실험 학습·보정·평가", main)

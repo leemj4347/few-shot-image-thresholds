@@ -73,7 +73,7 @@ def rehash_one(name, root, dest, parts, p, ex, smoke):
     todo = [i for i in range(len(chunks)) if not (pdir / f"part_{i:05d}.npz").exists()]
     tset = set(todo)
     done_rows = sum(len(by_file[f]) for i in range(len(chunks)) if i not in tset for f in chunks[i])
-    p.advance("rows", done_rows, file=name, resumed=done_rows)
+
     futures = {ex.submit(work, (str(root), [(f, by_file[f]) for f in chunks[i]])): i for i in todo}
     from concurrent.futures import as_completed
     for fu in as_completed(futures):
@@ -86,7 +86,7 @@ def rehash_one(name, root, dest, parts, p, ex, smoke):
                  orig_gid=np.array([m[1] for m in meta], dtype=object), orig_w=np.array([m[2] for m in meta], dtype=np.int64),
                  orig_h=np.array([m[3] for m in meta], dtype=np.int64))
         os.replace(tmp, pdir / f"part_{i:05d}.npz")
-        p.advance("rows", len(res), file=name, chunk=i + 1, of=len(chunks))
+
 
     new = old.copy()
     keep = np.zeros(len(old), bool)
@@ -131,19 +131,18 @@ def rehash_one(name, root, dest, parts, p, ex, smoke):
     return rep
 
 
-def main(args, out, holder):
+def main(args, out):
     smoke = args.smoke
     dest = C.output_path(C.OUT_ROOT / "data" / "hashes_smoke" if smoke else C.ROOT / "data" / "hashes")
     dest.mkdir(parents=True, exist_ok=True)
     parts = C.output_path(C.OUT_ROOT / "data" / "rehash_parts_smoke" if smoke else C.ROOT / "data" / "rehash_parts")
-    names = ["nft", "nft_var3"] if smoke else [p + s for p in POOLS for s in SUFFIX]
+    names = ["nft", "nft_var3"] if smoke else [None + s for p in POOLS for s in SUFFIX]
     root_of = lambda n: C.ROOTS[n.replace("_var3", "").replace("_var", "")]
     total = 0
     for n in names:
         o = pd.read_parquet(C.INPUT_CACHE / f"hashes_{n}.parquet", columns=["file", "ok"])
         total += int(o.ok.sum()) if not smoke else int(o[o.file.isin(sorted(o.file[o.ok].unique())[:20])].ok.sum())
-    p = C.Progress("hashes", "해시 계산(DBpHash·pHash)", {"design": 1, "rows": total, "report": 1}, smoke, args.log)
-    holder["progress"] = p
+
     design = {}
     for f in DESIGN_FILES:
         src = C.INPUT_CACHE / f
@@ -156,13 +155,13 @@ def main(args, out, holder):
     dd.mkdir(parents=True, exist_ok=True)
     if not (dd / "inclusion_fixed.json").exists(): shutil.copyfile(incl, dd / "inclusion_fixed.json")
     design["inclusion_fixed.json"] = C.sha256(dd / "inclusion_fixed.json")
-    p.advance("design", files=len(design))
+
     workers = int(os.environ.get("WORKERS", "0")) or max(1, int((os.cpu_count() or 2) * 0.7))
     report = {"workers": workers, "design_files_sha256": design, "time": datetime.datetime.now().isoformat()}
     with ProcessPoolExecutor(max_workers=workers, initializer=_init) as ex:
         for n in names:
-            report[n] = rehash_one(n, root_of(n), dest, parts, p, ex, smoke)
-    p.advance("report")
+            report[n] = rehash_one(n, root_of(n), dest, parts, None, ex, smoke)
+
     return {n: {"rows": report[n]["rows"], "mid_different": report[n]["mid_u64"]["different"],
                 "mid_different_float_round_trip": report[n]["mid_u64"]["different_equal_to_float64_round_trip_of_new"]} for n in names}
 

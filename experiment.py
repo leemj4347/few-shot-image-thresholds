@@ -14,7 +14,6 @@ MODULE_DIR = ROOT / 'src'
 ARMS = OUT_ROOT / 'results' / 'main' / 'arms'
 MODELS = ROOT / 'models'
 RESULTS = OUT_ROOT / 'results'
-LOGS = OUT_ROOT / 'logs'
 BASE_RESULTS = ROOT / 'results'
 
 def stored(p):
@@ -40,10 +39,8 @@ DELTA = 0.05
 EDIT_GROUPS = {'photometric': ['gauss_s05', 'gauss_s10', 'gauss_s20', 'jpeg_q05', 'jpeg_q02', 'median_k05', 'median_k09', 'gamma_g080', 'gamma_g125', 'resize_f075', 'resize_f050'], 'geometric': ['rotate_d01', 'rotate_d03', 'rotkeep_d02', 'rotkeep_d05', 'cropkeep_f098', 'cropkeep_f095', 'cropkeep_f090', 'shift_f001', 'shift_f003', 'padedge_f002', 'padedge_f005'], 'overlay': ['text_s10']}
 
 def output_path(path) -> Path:
-    p = Path(path).resolve()
-    if p != ROOT and ROOT not in p.parents:
-        raise PermissionError(f'write outside the project directory refused: {p}')
-    return p
+    return Path(path).resolve()
+
 
 def out_dir(step: str, smoke: bool=False) -> Path:
     d = output_path(RESULTS / ('smoke' if smoke else '') / step)
@@ -83,41 +80,8 @@ def sha256(path) -> str:
             h.update(block)
     return h.hexdigest()
 
-def source_path(name: str) -> Path:
-    for d in (ROOT, ROOT / 'experiments'):
-        if (d / name).is_file():
-            return d / name
-    raise FileNotFoundError(name)
 
-def _dir_fingerprint(folder) -> dict:
-    folder = Path(folder)
-    if not folder.exists():
-        return {'files': 0, 'bytes': 0, 'newest_mtime': None}
-    files = [f for f in folder.rglob('*') if f.is_file()]
-    return {'files': len(files), 'bytes': int(sum((f.stat().st_size for f in files))), 'newest_mtime': max((f.stat().st_mtime for f in files), default=None)}
 
-class Progress:
-    def __init__(self, step, title, units, smoke=False, log=None):
-        self.lock = threading.RLock()
-        self.data = {'buckets': {k: {'total': int(v), 'done': 0} for k, v in units.items()}}
-
-    def set_total(self, bucket, total):
-        self.data['buckets'].setdefault(bucket, {'total': 0, 'done': 0})['total'] = int(total)
-
-    def stage(self, *args, **kwargs):
-        pass
-
-    def advance(self, *args, **kwargs):
-        pass
-
-    def _write(self):
-        pass
-
-    def finish(self, **kwargs):
-        pass
-
-    def fail(self, error):
-        pass
 
 def run_step(step, title, main, argv=None):
     ap = argparse.ArgumentParser(description=title)
@@ -128,7 +92,10 @@ def run_step(step, title, main, argv=None):
     ap.add_argument('--part', default='all')
     args = ap.parse_args(argv)
     args.log = None
-    main(args, out_dir(step, args.smoke), {})
+    target = RESULTS / ('smoke' if args.smoke else '') / step
+    if target.exists() and any(target.iterdir()):
+        raise FileExistsError(f'Choose an empty results directory before running {step}: {target}')
+    main(args, out_dir(step, args.smoke))
 
 _S = None
 
@@ -143,15 +110,6 @@ def runner():
             _mod = importlib.import_module('methods.' + _name)
             _mod.SOURCE = FISCH_SOURCE
             _mod.HASH_FILE = FISCH_HASH
-        if RUN_ROOT is not None:
-            _train_or_load = S.model
-
-            def _load_only(mode, variant, alpha, seed, *a, **k):
-                md = Path(S.CACHE) / f'{mode}__{variant}__a{alpha}__s{seed}' / 'metadata.json'
-                if RUN_ROOT not in Path(S.CACHE).resolve().parents and (not md.exists()):
-                    raise RuntimeError(f'trained model missing (verification runs do not train): {md.parent}')
-                return _train_or_load(mode, variant, alpha, seed, *a, **k)
-            S.model = _load_only
         _S = S
     return _S
 
@@ -162,10 +120,8 @@ def modules():
     import registry as REG
     return (S, MF, T, REG)
 
-def load_reference(progress: Progress | None=None):
+def load_reference(progress=None):
     S = runner()
-    if progress:
-        progress.stage('load_tasks', note='verifying task cache checksums (read only)')
     _, m, cfg = S.X.reference_inputs(S.X.DEFAULT)
     bundles, invalid = S.X.load_tasks(m)
     bundles = [b for b in bundles if b.scheme == 'dbp']

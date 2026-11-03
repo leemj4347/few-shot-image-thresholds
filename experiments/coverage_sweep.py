@@ -56,30 +56,30 @@ def run_level(S, MF, a, test, fit, cal, dev, fixed, modes, seeds, arms, p):
                     rows.append(F2.score(S, b, kind, d, tau, n, a, name))
         F2.save_arm(pd.DataFrame(rows), token, arms)
         C.atomic_json(arms / f'{token}.metadata.json', dict(n=n, beta=beta, alpha=a, boundary_case=False, cp_rank=rank, np_rank=k, hash_tau=tau_h))
-    p.advance('baselines', alpha=a)
+
     token = f'reference_n{n}_{tag}'
     if not arm_done(arms, token):
         rows = [F2.score(S, b, kind, d, S.SIM.tau_empirical(d['Z_eval'], a), n, a, REF_NAME) for b in test for kind, d in b.reg.items()]
         F2.save_arm(pd.DataFrame(rows), token, arms)
         C.atomic_json(arms / f'{token}.metadata.json', dict(n=n, beta=beta, alpha=a, rule='similarity.tau_empirical(Z_eval, alpha)'))
-    p.advance('reference', alpha=a)
+
     for mode in modes:
         for s in seeds:
             tok = f'n{n}_{tag}_{mode}_s{s}'
             if all(arm_done(arms, f'{tok}_{c}') for c in F2.CAL):
-                p.advance('training', skipped=True)
-                p.advance('evaluation', len(F2.CAL), skipped=True)
+
+
                 continue
             t0 = time.perf_counter()
             obj, md, path = S.model(mode, C.VAR[mode], a, s, fit, dev)
             if md['epochs'] != 15 or md['pool'] != 'mean' or md.get('reused'):
                 raise ValueError('stored model settings differ (epochs, pool or reused)')
             tt = time.perf_counter() - t0
-            p.advance('training', alpha=a, model=mode, training_seed=s, best_epoch=md['best_epoch'])
+
             for c in F2.CAL:
                 arm = f'{tok}_{c}'
                 if arm_done(arms, arm):
-                    p.advance('evaluation', skipped=True)
+
                     continue
                 corr = S.calibration(obj, mode, a, cal, c)
                 lam = corr['global']['Lambda']
@@ -94,7 +94,7 @@ def run_level(S, MF, a, test, fit, cal, dev, fixed, modes, seeds, arms, p):
                     raise ValueError('expected 1016 registries')
                 F2.save_arm(df, arm, arms)
                 C.atomic_json(arms / f'{arm}.metadata.json', dict(n=n, beta=beta, alpha=a, mode=mode, variant=C.VAR[mode], training_seed=s, model_path=str(path), model_sha256=C.sha256(path / 'model.pt'), metadata=md, calibration=corr, timing={'training_s': tt}))
-                p.advance('evaluation', alpha=a, model=mode, training_seed=s, calibration=c)
+
 
 def aggregate(out, arms, alphas, modes, seeds):
     missing = [t for t in expected_tokens(alphas, modes, seeds) if not arm_done(arms, t)]
@@ -115,7 +115,7 @@ def aggregate(out, arms, alphas, modes, seeds):
     C.save_csv(pool, out / 'pool_summary.csv')
     return summ
 
-def main(args, out, holder):
+def main(args, out):
     t_start = time.time()
     S = C.runner()
     S.encode = F2.encode(S)
@@ -129,18 +129,17 @@ def main(args, out, holder):
     mroot = C.OUT_ROOT / 'models_coverage_smoke' if args.smoke else C.ROOT / 'models_coverage'
     name = 'coverage' + ('' if what != 'part' else '_p' + args.part.replace('/', 'of'))
     L = 0 if what == 'aggregate' else len(todo)
-    p = C.Progress(name, '명목 수준 99개 (n = 100, 추가 분석)', {'tasks': 0 if what == 'aggregate' else 1, 'baselines': L, 'reference': L, 'training': L * len(modes) * len(seeds), 'evaluation': L * len(modes) * len(seeds) * len(F2.CAL), 'aggregate': 0 if what == 'part' else 1}, args.smoke, args.log)
-    holder['progress'] = p
+
     if what != 'aggregate':
-        fit, cal, dev, test, fixed = F2.prepare(S, p, out)
-        p.advance('tasks', fixed_gamma=fixed['DBpHash fixed'], youden=fixed['Youden J'], otsu=fixed['Otsu'])
+        fit, cal, dev, test, fixed = F2.prepare(S, None, out)
+
         S.CACHE = C.output_path(mroot / f'n{N}')
         for a in todo:
-            run_level(S, MF, a, test, fit, cal, dev, fixed, modes, seeds, arms, p)
+            run_level(S, MF, a, test, fit, cal, dev, fixed, modes, seeds, arms, None)
     result = {'part': args.part, 'levels_run': len(todo) if what != 'aggregate' else 0}
     if what != 'part':
         summ = aggregate(out, arms, alphas, modes, seeds)
-        p.advance('aggregate')
+
         prop = summ[summ.method == 'Meta set + np_global'].sort_values('alpha')
         result['proposed_mean_FAR_below_alpha_levels'] = int((prop.FAR <= prop.alpha + 1e-12).sum())
         result['proposed_V_le_delta_levels'] = int((prop.V <= C.DELTA + 1e-12).sum())

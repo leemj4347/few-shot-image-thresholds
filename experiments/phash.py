@@ -19,26 +19,25 @@ def task_token(key):
     return hashlib.sha256(json.dumps(list(key)).encode()).hexdigest()
 
 
-def build(args, out, holder):
+def build(args, out):
     S, MF, T, REG = C.modules()
     scheme = args.scheme
     if scheme not in REG.SCHEMES or scheme == "dbp":
         raise ValueError("scheme must be phash or iphash")
-    p = C.Progress("phash_build", f"{scheme} 태스크 생성", {"reference": 1, "pools": 1, "bundles": 1}, args.smoke, args.log)
-    holder["progress"] = p
+
     _, m, cfg = S.X.reference_inputs(S.X.DEFAULT)
-    p.stage("load_reference_tasks")
+
     dbp, _ = S.X.load_tasks(m)
     dbp = [b for b in dbp if b.scheme == "dbp"]
     ref = {(b.role, b.domain, b.structure, int(b.M), int(b.seed)): b for b in dbp}
     keys = sorted(ref)
     if args.smoke:
         keys = [k for r in ("train", "dev", "test") for k in [x for x in keys if x[0] == r][:3]]
-    p.advance("reference")
-    p.set_total("bundles", len(keys))
+
+    None.set_total("bundles", len(keys))
     root = Path(cfg["root"])
     table = T.load_role_table(m["role_table"])
-    p.stage("load_pools", scheme=scheme)
+
     pools, variants = ({}, {})
     for name, pc in cfg["pools"].items():
         pools[name] = REG.Pool(root / pc["cache"], name=name, scheme=scheme)
@@ -62,7 +61,7 @@ def build(args, out, holder):
         n_dbp = REG.Pool(root / pc["cache"], name=name, scheme="dbp").n
         if n_dbp != pools[name].n:
             raise RuntimeError(f"pool {name}: {scheme} has {pools[name].n} images, dbp {n_dbp}")
-    p.advance("pools")
+
     folder = cache_dir(scheme, args.smoke)
     folder.mkdir(parents=True, exist_ok=True)
     old_n = T.N_LIST[:]
@@ -76,7 +75,7 @@ def build(args, out, holder):
             npz = folder / (tok + ".npz")
             rec = folder / (tok + ".complete.json")
             if rec.exists():
-                p.advance("bundles", skipped=True, role=role, domain=dom, M=M, seed=seed)
+
                 continue
             if (dom, role) not in rp_cache:
                 rp_cache[dom, role] = T.role_pool(dom_pool[dom], dom_roles[dom], role)
@@ -103,7 +102,7 @@ def build(args, out, holder):
                     "time": datetime.datetime.now().isoformat(),
                 },
             )
-            p.advance("bundles", role=role, domain=dom, M=M, seed=seed, built=i + 1, of=len(keys))
+
     finally:
         T.N_LIST = old_n
     if mism:
@@ -127,7 +126,7 @@ def load_cache(T, folder):
     return out
 
 
-def run(args, out, holder):
+def run(args, out):
     S, MF, T, REG = C.modules()
     scheme = args.scheme
     w = S.SIM.SCHEME_W[scheme]
@@ -135,20 +134,7 @@ def run(args, out, holder):
     ns = (100,) if args.smoke else NS
     alphas = (0.05,) if args.smoke else ALPHAS
     seeds = C.SEEDS[:1] if args.smoke else C.SEEDS
-    p = C.Progress(
-        "phash",
-        f"{scheme} 학습·보정·평가",
-        {
-            "tasks": 1,
-            "baselines": len(ns) * len(alphas),
-            "training": len(ns) * len(alphas) * len(seeds),
-            "evaluation": len(ns) * len(alphas) * len(seeds) * len(CALS),
-            "aggregate": 1,
-        },
-        args.smoke,
-        args.log,
-    )
-    holder["progress"] = p
+
     bundles = load_cache(T, cache_dir(scheme, args.smoke))
     train = [b for b in bundles if b.role == "train"]
     fit, cal = S.R.split_train_cal(train, 0.5)
@@ -162,7 +148,7 @@ def run(args, out, holder):
     tau_h = MF.fit_C0h(w)
     C.prepare_test(test, tau_h, names)
     regs = [(b, k, d) for b in test for k, d in b.reg.items()]
-    p.advance("tasks")
+
     d0, gen = MF.dev_pair_scores(dev)
     fixed = {
         "Hash convention (10 bits)": tau_h,
@@ -186,7 +172,7 @@ def run(args, out, holder):
                 taus["Direct NP"] = C.succ(float(z[k_np - 1]), g) if k_np <= n else float("inf")
                 for name, tau in taus.items():
                     rows.append(C.row(b, k, d, tau, n, a, name, names, scheme=scheme))
-            p.advance("baselines", n=n, alpha=a)
+
     S.old_source = lambda *x: None
     cal_info = []
     for n in ns:
@@ -195,13 +181,13 @@ def run(args, out, holder):
         for a in alphas:
             for s in seeds:
                 obj, md, path = S.model(MODE, C.VAR[MODE], a, s, fit, dev, None)
-                p.advance("training", n=n, alpha=a, training_seed=s, best_epoch=md["best_epoch"])
+
                 for c in CALS:
                     if c.startswith("fisch") and len(cal) < S.FC.calibration_min_tasks(a):
                         if not args.smoke:
                             raise RuntimeError(f"too few calibration tasks for Fisch calibration: {len(cal)}")
                         cal_info.append(dict(n=n, alpha=a, training_seed=s, calibration=c, skipped="smoke: too few calibration tasks"))
-                        p.advance("evaluation", n=n, alpha=a, training_seed=s, calibration=c, skipped=True)
+
                         continue
                     info = S.calibration(obj, MODE, a, cal, c)
                     lam = info["global"]["Lambda"]
@@ -210,7 +196,7 @@ def run(args, out, holder):
                         q = S.predict(obj, d, a, MODE, b.domain)
                         tau = C.succ(S.FC.corrected_boundary(q, lam), g)
                         rows.append(C.row(b, k, d, tau, n, a, f"Meta set + {c}", names, seed=s, scheme=scheme, q_pred=q, Lambda=lam))
-                    p.advance("evaluation", n=n, alpha=a, training_seed=s, calibration=c)
+
     R = pd.DataFrame(rows)
     C.save_parquet(R, out / "rows.parquet")
     C.atomic_json(out / "calibration.json", cal_info)
@@ -222,15 +208,15 @@ def run(args, out, holder):
     for (n, a), gsub in summ[summ.method == "Meta set + np_global"].groupby(["n", "alpha"]):
         V = float(gsub.V.iloc[0])
         judg.append(dict(n=n, alpha=a, V=V, judgment="PASS" if V <= C.DELTA + 1e-12 else "NON PASS"))
-    p.advance("aggregate")
+
     return {"scheme": scheme, "judgment": judg}
 
 
-def main(args, out, holder):
+def main(args, out):
     if args.part == "build":
-        return build(args, out, holder)
+        return build(args, out)
     if args.part == "run":
-        return run(args, out, holder)
+        return run(args, out)
     raise ValueError("--part build | run")
 if __name__ == "__main__":
     import sys

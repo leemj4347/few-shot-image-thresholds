@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 from torch import nn
+from .author_source import load_deepset
 from . import calibration as FC
 from . import statmlp as SUMMARY
 import similarity as SIM
@@ -22,17 +23,7 @@ COMMIT = "bcd18d1726541da827f7530a724460bd735bc0ed"
 
 # Load the DeepSet class from the author source
 def source_class():
-    raw = SOURCE.read_bytes()
-    digest = hashlib.sha256(raw).hexdigest()
-    record = json.loads(HASH_FILE.read_text(encoding="utf-8-sig"))
-    expected = next(x["sha256"].lower() for x in record if x["file"] == "mini_imagenet/quantile_snn.py")
-    if digest != expected:
-        raise RuntimeError("Author source SHA256 mismatch")
-    tree = ast.parse(raw.decode("utf-8"))
-    node = next((n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "DeepSet"))
-    scope = {"nn": nn}
-    exec(compile(ast.Module(body=[node], type_ignores=[]), str(SOURCE), "exec"), scope)
-    return (scope["DeepSet"], digest)
+    return load_deepset(SOURCE, HASH_FILE)
 DOMAINS = ("disc21", "mixed", "solana")
 DOMAIN_LABELS = DOMAINS + ("nft",)
 INPUTS = {"base": 1, "domain": 1 + len(DOMAIN_LABELS), "pair": 8}

@@ -146,18 +146,17 @@ class Lookup:
         return self._get(list(zip(pv.dataset, pv.file, pv.variant)))
 
 
-def main(args, out, holder):
+def main(args, out):
     S, MF, T, REG = C.modules()
-    p = C.Progress("sscd_build", "SSCD 태스크 생성", {"reference": 1, "pools": 1, "bundles": 1}, args.smoke, args.log)
-    holder["progress"] = p
+
     _, m, cfg = S.X.reference_inputs(S.X.DEFAULT)
     dbp, _ = S.X.load_tasks(m)
     ref = {(b.role, b.domain, b.structure, int(b.M), int(b.seed)): b for b in dbp if b.scheme == "dbp"}
     keys = sorted(ref)
     if args.smoke:
         keys = [k for r in ("train", "dev", "test") for k in [x for x in keys if x[0] == r][:3]]
-    p.advance("reference")
-    p.set_total("bundles", len(keys))
+
+    None.set_total("bundles", len(keys))
     root = Path(cfg["root"])
     table = T.load_role_table(m["role_table"])
     pools, variants = ({}, {})
@@ -181,7 +180,7 @@ def main(args, out, holder):
         dom_roles[dom] = T.roles_from_table(dom_pool[dom], table)
     info = json.loads((C.WEIGHTS.parent / "weights_info.json").read_text(encoding="utf-8")) if C.WEIGHTS.parent.joinpath("weights_info.json").exists() else {"dim": 512}
     lookup = Lookup(args.smoke, info["dim"])
-    p.advance("pools")
+
     folder = C.output_path(C.OUT_ROOT / "data" / "sscd_tasks_smoke" if args.smoke else C.ROOT / "data" / "sscd_tasks")
     folder.mkdir(parents=True, exist_ok=True)
     rp_cache = {}
@@ -191,7 +190,7 @@ def main(args, out, holder):
         npz = folder / (tok + ".npz")
         rec = folder / (tok + ".complete.json")
         if rec.exists():
-            p.advance("bundles", skipped=True, role=role, domain=dom)
+
             continue
         if (dom, role) not in rp_cache:
             rp = T.role_pool(dom_pool[dom], dom_roles[dom], role)
@@ -219,7 +218,7 @@ def main(args, out, holder):
                 "time": datetime.datetime.now().isoformat(),
             },
         )
-        p.advance("bundles", role=role, domain=dom, M=M, seed=seed, built=i + 1, of=len(keys))
+
     return {"scheme": "sscd", "tasks": len(keys), "cache": str(folder)}
 if __name__ == "__main__":
     C.run_step("sscd_build", "SSCD 태스크 생성", main)
