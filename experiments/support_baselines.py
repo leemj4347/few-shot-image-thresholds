@@ -1,14 +1,11 @@
 # Baselines for small support sets
 from __future__ import annotations
-import math
 import numpy as np, pandas as pd
-from scipy.stats import binom, genpareto
+from scipy.stats import binom
 import experiment as C
 
 NS = (10, 20, 50, 100)
 ALPHAS = (0.01, 0.05)
-U_Q = 0.90
-K_MIN = 5
 MODE = "base_set"
 
 
@@ -21,37 +18,13 @@ def np_rank(N, alpha, delta=C.DELTA):
     return k if k <= N else None
 
 
-def np_threshold(scores, alpha, g):
-    z = np.sort(np.asarray(scores, float))
-    k = np_rank(len(z), alpha)
-    return (C.succ(float(z[k - 1]), g), k) if k else (float("inf"), None)
 
 
-def gpd_boundary(z, alpha):
-    z = np.sort(np.asarray(z, float))
-    n = len(z)
-    u = float(np.quantile(z, U_Q, method="inverted_cdf"))
-    y = z[z > u] - u
-    k = len(y)
-    if k < K_MIN: return float("inf"), "too_few_exceedances"
-    p_u = k / n
-    if alpha >= p_u: return u, "alpha_above_tail"
-    try:
-        xi, loc, sig = genpareto.fit(y, floc=0)
-    except Exception:
-        return float("inf"), "fit_failed"
-    if not (np.isfinite(xi) and np.isfinite(sig) and sig > 0): return float("inf"), "fit_failed"
-    r = alpha / p_u
-    q = u + sig * math.log(1 / r) if abs(xi) < 1e-9 else u + sig / xi * (r ** (-xi) - 1)
-    return float(q), "ok"
 
 
 def main(args, out):
     ns = (10, 100) if args.smoke else NS
     seeds = C.SEEDS[:1] if args.smoke else C.SEEDS
-    units = {"tasks": 1, "pooled": len(ALPHAS), "per_n": len(ns) * len(ALPHAS) * 2, "crc": len(ns) * len(ALPHAS) * len(seeds),
-             "aggregate": 1}
-
     S, m, cfg, fit, cal, dev, test = C.load_reference(None)
     names = S.CR.variant_names()
     g = C.grid()
@@ -62,28 +35,8 @@ def main(args, out):
     floor = float(np.min(np.diff(g)))
     rows, info = [], []
 
-    fitM = sorted({int(b.reg["base"]["M"]) for b in fit})
-    pooled = {}
-    for a in ALPHAS:
-        allz = np.concatenate([b.reg["base"]["Z_eval"] for b in fit])
-        pooled[(a, "global")] = np_threshold(allz, a, g)
-        for M in fitM:
-            zM = np.concatenate([b.reg["base"]["Z_eval"] for b in fit if int(b.reg["base"]["M"]) == M])
-            pooled[(a, M)] = np_threshold(zM, a, g)
-        info.append(dict(method="Pooled NP", alpha=a, global_tau=pooled[(a, "global")][0], global_rank=pooled[(a, "global")][1],
-                         pooled_scores=int(len(allz)), by_M={str(M): pooled[(a, M)][0] for M in fitM}))
-
-    near = lambda M: min(fitM, key=lambda x: (abs(math.log10(x) - math.log10(M)), -x))
     for n in ns:
         for a in ALPHAS:
-            for b, k, d in regs:
-                rows.append(C.row(b, k, d, pooled[(a, "global")][0], n, a, "Pooled NP (global)", names))
-                rows.append(C.row(b, k, d, pooled[(a, near(int(d["M"])))][0], n, a, "Pooled NP (nearest M)", names,
-                                  pooled_M=near(int(d["M"]))))
-                bd, status = gpd_boundary(np.asarray(d["Z_sup"], float)[:n], a)
-                rows.append(C.row(b, k, d, C.succ(bd, g), n, a, "GPD tail (support)", names, fit_status=status))
-
-
             t = []
             for b in cal:
                 d = b.reg["base"]
@@ -161,8 +114,6 @@ def main(args, out):
     C.save_csv(cond, out / "conditions.csv")
     summ = C.method_summary(cond)
     C.save_csv(summ, out / "summary.csv")
-    gs = R[R.method == "GPD tail (support)"].groupby(["n", "alpha"]).fit_status.value_counts().unstack(fill_value=0)
-    gs.to_csv(C.output_path(out / "gpd_fit_status.csv"), encoding="utf-8-sig")
 
     return {"methods_new": sorted(R.method.unique()), "n": list(ns), "alphas": list(ALPHAS)}
 

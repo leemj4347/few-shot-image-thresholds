@@ -28,7 +28,7 @@ import tasks as T
 
 import registry_evaluation as R
 
-from methods import meta_quantile as F
+from methods import conditional_predictor as F
 
 def sha(path):
     h = hashlib.sha256()
@@ -71,15 +71,6 @@ def task_cache(original, folder, fingerprint):
         return b
     return build
 
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--config", required=True)
-    ap.add_argument("--role-table", required=True)
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--inclusion")
-    ap.add_argument("--build-only", action="store_true")
-    args = ap.parse_args()
-    run(args.config, args.role_table, args.out, args.inclusion, args.build_only)
 
 def run(config_path, role_path, out, inclusion=None, build_only=True):
     if not build_only:
@@ -101,7 +92,7 @@ def run(config_path, role_path, out, inclusion=None, build_only=True):
     if inclusion is None or not Path(inclusion).is_file():
         raise FileNotFoundError(inclusion)
     srcfiles = [HERE / name for name in ["tasks.py", "registry.py", "similarity.py", "transforms.py", "evaluate_registry.py"]]
-    codefiles = srcfiles + [Path(__file__), HERE / "methods/meta_quantile.py", HERE / "methods/calibration.py", HERE / "registry_evaluation.py", HERE / "criteria.py"]
+    codefiles = srcfiles + [Path(__file__), HERE / "methods/conditional_predictor.py", HERE / "methods/calibration.py", HERE / "registry_evaluation.py", HERE / "criteria.py"]
     inputs = {}
     for pool in cfg["pools"].values():
         for field in ["cache", "variants", "variants2"]:
@@ -130,3 +121,14 @@ def run(config_path, role_path, out, inclusion=None, build_only=True):
         T.build_bundle, T.N_LIST = original_build, original_n
         (out / "reference_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     return manifest
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", required=True)
+    ap.add_argument("--role-table", required=True)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--inclusion")
+    ap.add_argument("--build-only", action="store_true")
+    args = ap.parse_args()
+    run(args.config, args.role_table, args.out, args.inclusion, args.build_only)

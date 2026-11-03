@@ -24,75 +24,19 @@ COMMIT = "bcd18d1726541da827f7530a724460bd735bc0ed"
 # Load the DeepSet class from the author source
 def source_class():
     return load_deepset(SOURCE, HASH_FILE)
-DOMAINS = ("disc21", "mixed", "solana")
-DOMAIN_LABELS = DOMAINS + ("nft",)
-INPUTS = {"base": 1, "domain": 1 + len(DOMAIN_LABELS), "pair": 8}
-
-
-def count_parameters(arch, hidden, c):
-    return 3 * hidden * hidden + (6 + c) * hidden + 1 if arch == "set" else hidden * hidden + (10 + c) * hidden + 1
-
-
-def matched_width(c):
-    target = count_parameters("set", 256, c)
-    return min(range(1, 1001), key=lambda h: (abs(count_parameters("summary", h, c) - target), h))
-MODES = {f"{v}_{a}": 256 if a in ("set", "summary256") else matched_width(c) for v, c in INPUTS.items() for a in ("set", "summary256", "summarymatched")}
-PARAMETERS = {m: count_parameters("set" if m.endswith("_set") else "summary", h, INPUTS[m.split("_")[0]]) for m, h in MODES.items()}
-GRID = SIM.score_grid(SIM.SCHEME_W["dbp"]).ravel()
-GRID_ORDER = np.argsort(GRID, kind="stable")
-
-
-def pair_features(hist, n, M):
-    if not isinstance(hist, dict) or n not in hist:
-        raise ValueError("Missing support pair histogram")
-    H = np.asarray(hist[n])
-    if H.shape != (65, 65) or not np.isfinite(H).all() or (H < 0).any() or (not np.equal(H, np.floor(H)).all()):
-        raise ValueError("Invalid integer pair histogram")
-    N = int(H.sum())
-    if N != n * int(M) or N <= 0:
-        raise ValueError("Pair histogram information budget mismatch")
-    counts = H.ravel()[GRID_ORDER].astype(np.int64)
-    vals = GRID[GRID_ORDER]
-    mask = counts > 0
-    counts = counts[mask]
-    vals = vals[mask]
-    cdf = np.cumsum(counts)
-
-    def ascending(rank):
-        return float(vals[np.searchsorted(cdf, rank, side="left")])
-
-    def descending(rank):
-        return ascending(N - min(rank, N) + 1)
-    k = max(1, N // 8)
-    p = counts.astype(np.float64) / N
-    mean = float(p @ vals)
-    variance = float(p @ (vals - mean) ** 2)
-    std = np.sqrt(max(variance, 0.0))
-    skew = float(p @ (vals - mean) ** 3 / std ** 3) if std > 1e-12 else 0.0
-    median = ascending((N + 1) // 2) if N % 2 else (ascending(N // 2) + ascending(N // 2 + 1)) / 2
-    return np.array([descending(k), descending(2 * k), descending(4 * k), float(vals[-1]), median, std, skew])
+INPUTS = {"base": 1}
+MODES = {"base_set": 256, "base_summary256": 256}
+PARAMETERS = {"base_set": 198401, "base_summary256": 68353}
 
 
 def feature_names(mode):
-    variant, arch = mode.split("_", 1)
-    names = ["log10M"]
-    if variant == "domain":
-        names += ["domain_" + d for d in DOMAIN_LABELS]
-    if variant == "pair":
-        names += ["pair_" + x for x in SUMMARY.FEATURES[:7]]
-    return (["score_set"] if arch == "set" else SUMMARY.FEATURES[:7]) + names
+    return (["score_set"] if mode.endswith("_set") else SUMMARY.FEATURES[:7]) + ["log10M"]
 
 
 def context(mode, n, M, domain, hist):
-    variant = mode.split("_")[0]
-    v = [np.log10(M)]
-    if variant == "domain":
-        if domain not in DOMAIN_LABELS:
-            raise ValueError("Unknown domain")
-        v.extend(float(domain == d) for d in DOMAIN_LABELS)
-    if variant == "pair":
-        v.extend(pair_features(hist, n, M))
-    return np.asarray(v, dtype=np.float64)
+    if mode not in MODES:
+        raise ValueError(f"Unknown model mode: {mode}")
+    return np.asarray([np.log10(M)], dtype=np.float64)
 
 
 class ConditionalSet(nn.Module):
@@ -121,7 +65,7 @@ class ConditionalSet(nn.Module):
 
 def make_head(mode, hidden):
     if mode not in MODES or hidden != MODES[mode]:
-        raise ValueError("Model width differs from prior specification")
+        raise ValueError(f"Expected hidden width {MODES.get(mode)} for mode {mode!r}; got {hidden}")
     variant, arch = mode.split("_", 1)
     c = INPUTS[variant]
     cls, _ = source_class()
@@ -131,15 +75,7 @@ def make_head(mode, hidden):
     else:
         out = copy.deepcopy(head.combiner)
         base = nn.Linear(8, int(hidden))
-        if c == 1:
-            out[0] = base
-        else:
-            layer = nn.Linear(7 + c, int(hidden))
-            with torch.no_grad():
-                layer.weight[:, :8].copy_(base.weight)
-                layer.weight[:, 8:].zero_()
-                layer.bias.copy_(base.bias)
-            out[0] = layer
+        out[0] = base
     if sum((p.numel() for p in out.parameters())) != PARAMETERS[mode]:
         raise ValueError("Parameter count mismatch")
     return out
@@ -235,7 +171,7 @@ class Backend:
             "batch_size": 64,
             "pooling": "author mean",
             "standardization": False,
-            "source_file": str(SOURCE),
+            "source_file": "mini_imagenet/quantile_snn.py",
             "families": {},
             "features": feature_names(self.mode),
             "initialization": "untrained author source; conditional extra column zero",

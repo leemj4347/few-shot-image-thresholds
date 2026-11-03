@@ -61,8 +61,8 @@ GEOMETRIC2 = [n for n, f, _ in _ALL if f in ("scale", "rotate", "crop", "resize"
 REFRAMING = [n for n, f, _ in _ALL if f in ("scale", "crop", "rotate", "padedge")]
 CONTENT_PRESERVING = [n for n, f, _ in _ALL if f in ("resize", "cropkeep", "shift", "rotkeep", "text")]
 
-SPEC_VERSIONS = {"v2": "transforms v (17종, 저자 배포본 규약)",
-                 "v3": "transforms v (23종, 내용 보존 편집 중심)"}
+SPEC_VERSIONS = {"v2": "17 edits",
+                 "v3": "23 edits"}
 SPEC_VERSION = SPEC_VERSIONS[SPEC_CHOICE]
 
 

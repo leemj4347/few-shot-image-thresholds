@@ -9,7 +9,7 @@ import tasks as T
 import criteria as CR
 import evaluate_registry as EV
 import registry_evaluation as R
-from methods import registry_predictor as F
+from methods import conditional_predictor as F
 from task_builder import sha, read_json
 DEFAULT = Path(__file__).resolve().parents[2] / "results/tasks/reference"
 KEYS = R.COND_KEYS + ["scheme"]

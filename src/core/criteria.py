@@ -5,7 +5,8 @@ import similarity as SIM
 
 
 DELTA = 0.05
-BASELINE_METHOD = "원문 식 28"
+BASELINE_METHOD = "DBpHash fixed"
+HASH_METHOD = "Hash convention (10 bits)"
 
 
 # Secondary edit names used for detection rate

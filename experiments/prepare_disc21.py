@@ -1,4 +1,4 @@
-# Hashes and SSCD descriptors for the DISC21 external test
+# DBpHash features for the DISC21 external test
 from __future__ import annotations
 import json, os, zipfile, datetime
 from pathlib import Path
@@ -11,17 +11,16 @@ GT = C.DISC21 / "dev_ground_truth.csv"
 BATCH = 128
 
 
-# index.parquet (name) + mid/high uint64 + SSCD float32 + ok/done masks, resumable, inside this folder
+# Image names, DBpHash values and completion masks
 class FeatStore:
 
-    def __init__(self, folder: Path, names=None, dim=512):
+    def __init__(self, folder: Path, names=None):
         self.folder = C.output_path(folder)
         self.folder.mkdir(parents=True, exist_ok=True)
         ip = self.folder / "index.parquet"
         if names is not None and (not ip.exists()):
             C.save_parquet(pd.DataFrame({"name": list(names)}), ip)
             n = len(names)
-            np.lib.format.open_memmap(self.folder / "emb.npy", mode="w+", dtype=np.float32, shape=(n, dim))
             for f in ("mid", "high"):
                 np.lib.format.open_memmap(self.folder / f"{f}.npy", mode="w+", dtype=np.uint64, shape=(n,))
             np.save(self.folder / "done.npy", np.zeros(n, bool))
@@ -30,14 +29,13 @@ class FeatStore:
         if names is not None and list(self.index.name) != list(names):
             raise RuntimeError(f"index changed in {self.folder}")
         mode = "r+" if names is not None else "r"
-        self.emb = np.load(self.folder / "emb.npy", mmap_mode=mode)
         self.mid = np.load(self.folder / "mid.npy", mmap_mode=mode)
         self.high = np.load(self.folder / "high.npy", mmap_mode=mode)
         self.done = np.load(self.folder / "done.npy")
         self.ok = np.load(self.folder / "ok.npy")
 
     def save(self):
-        for a in (self.emb, self.mid, self.high):
+        for a in (self.mid, self.high):
             a.flush()
         for nm, arr in (("done", self.done), ("ok", self.ok)):
             tmp = self.folder / f"{nm}.tmp.npy"
@@ -52,8 +50,8 @@ class FeatStore:
         return s
 
 
-# read_bytes(i) -> bytes; decode + DBpHash + SSCD preprocessing in threads, SSCD batches on the model device
-def run_store(name, st, read_bytes, D, HC, model, p, ex):
+# Decode images and compute DBpHash in worker threads
+def run_store(name, st, read_bytes, D, HC, ex):
     todo = np.flatnonzero(~st.done)
 
 
@@ -62,7 +60,7 @@ def run_store(name, st, read_bytes, D, HC, model, p, ex):
         if img is None:
             return (None, 0, 0)
         h = D.dbphash(img, HC.CFG["bands"], HC.CFG["interp"])
-        return (C.sscd_tensor(img), HC.bits_to_u64(h["mid"]), HC.bits_to_u64(h["high"]))
+        return (True, HC.bits_to_u64(h["mid"]), HC.bits_to_u64(h["high"]))
     bad = 0
     chunks = [todo[b0:b0 + BATCH] for b0 in range(0, len(todo), BATCH)]
     submit = lambda ix: [ex.submit(prep, read_bytes(int(i))) for i in ix]
@@ -71,11 +69,9 @@ def run_store(name, st, read_bytes, D, HC, model, p, ex):
         res = [f.result() for f in pending]
         pending = submit(chunks[k + 1]) if k + 1 < len(chunks) else []
         good = [(i, t, m, h) for i, (t, m, h) in zip(ix, res) if t is not None]
-        E = C.sscd_embed_tensors(model, [g[1] for g in good]) if good else []
-        for (i, _, m, h), e in zip(good, E):
+        for i, _, m, h in good:
             st.mid[i] = np.uint64(m)
             st.high[i] = np.uint64(h)
-            st.emb[i] = e
             st.ok[i] = True
         for i, (t, _, _) in zip(ix, res):
             if t is None:
@@ -91,7 +87,6 @@ def run_store(name, st, read_bytes, D, HC, model, p, ex):
 
 def main(args, out):
     D, HC, _ = C.runtime_modules()
-    info = json.loads((C.WEIGHTS.parent / "weights_info.json").read_text(encoding="utf-8"))
     refs = [Path(s.strip()).stem for s in VAL_LIST.read_text(encoding="utf-8").splitlines() if s.strip()]
     zf = zipfile.ZipFile(QZIP)
     members = {Path(n).stem: n for n in zf.namelist() if n.lower().endswith((".jpg", ".jpeg", ".png"))}
@@ -102,9 +97,8 @@ def main(args, out):
         refs, qnames = (refs[:20], qnames[:20])
     base = C.OUT_ROOT / "data" / "disc21_features_smoke" if args.smoke else C.ROOT / "data" / "disc21_features"
 
-    model = C.sscd_load()
-    rs = FeatStore(base / "references", refs, info["dim"])
-    qs = FeatStore(base / "queries", qnames, info["dim"])
+    rs = FeatStore(base / "references", refs)
+    qs = FeatStore(base / "queries", qnames)
 
     def ref_bytes(i):
         f = REF_ROOT / (rs.index.name.iat[i] + ".jpg")
@@ -114,11 +108,11 @@ def main(args, out):
             return None
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=int(os.environ.get("WORKERS", "0")) or max(2, int((os.cpu_count() or 4) * 0.7))) as ex:
-        run_store("references", rs, ref_bytes, D, HC, model, None, ex)
-        run_store("queries", qs, lambda i: zf.read(members[qs.index.name.iat[i]]), D, HC, model, None, ex)
+        run_store("references", rs, ref_bytes, D, HC, ex)
+        run_store("queries", qs, lambda i: zf.read(members[qs.index.name.iat[i]]), D, HC, ex)
     zf.close()
     return {"unreadable_references": int((~rs.ok).sum()),
             "unreadable_queries": int((~qs.ok).sum())}
 
 if __name__ == "__main__":
-    C.run_step("disc21_prepare", "DISC21 외부 시험 특징(해시·SSCD)", main)
+    C.run_step("disc21_prepare", "DISC21 외부 시험 해시", main)

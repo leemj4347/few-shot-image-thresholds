@@ -18,7 +18,6 @@ SEED0 = 20261017
 DBP_MODES = {"base_set": "Meta set", "base_summary256": "Summary H256"}
 CALS = ("np_global", "fisch_global")
 FIXED_DBP = ("DBpHash fixed", "Youden J", "Equal error rate", "Otsu")
-SD_FLOOR_SSCD = 1e-06
 DOMAIN = "disc21_official"
 
 
@@ -34,33 +33,26 @@ def features(smoke):
             r_ok=rs.ok.copy(),
             r_mid=np.asarray(rs.mid),
             r_high=np.asarray(rs.high),
-            r_emb=np.asarray(rs.emb, np.float32),
             q_name=np.array(list(qs.index.name)),
             q_ok=qs.ok.copy(),
             q_mid=np.asarray(qs.mid),
             q_high=np.asarray(qs.high),
-            q_emb=np.asarray(qs.emb, np.float32),
             synthetic=False,
         )
     with zipfile.ZipFile(QZIP) as z:
         qn = sorted((Path(n).stem for n in z.namelist() if n.lower().endswith((".jpg", ".jpeg", ".png"))))
     rng = np.random.default_rng(0)
 
-    def unit(n):
-        x = rng.normal(size=(n, 512)).astype(np.float32)
-        return x / np.linalg.norm(x, axis=1, keepdims=True)
     u64 = lambda n: rng.integers(0, np.iinfo(np.uint64).max, n, dtype=np.uint64, endpoint=True)
     return dict(
         r_name=np.array(refs),
         r_ok=np.ones(len(refs), bool),
         r_mid=u64(len(refs)),
         r_high=u64(len(refs)),
-        r_emb=unit(len(refs)),
         q_name=np.array(qn),
         q_ok=np.ones(len(qn), bool),
         q_mid=u64(len(qn)),
         q_high=u64(len(qn)),
-        q_emb=unit(len(qn)),
         synthetic=True,
     )
 
@@ -106,21 +98,11 @@ def registry(Dz, M, seed):
     return ({"base": base, "grow_i": grown}, sup, ev, pos)
 
 
-def load_model_dir(S, path: Path, mode, alpha, seed):
-    import torch
-    md = json.loads((path / "metadata.json").read_text(encoding="utf-8-sig"))
-    if md["mode"] != mode or md["alpha"] != alpha or md["training_seed"] != seed:
-        raise ValueError(f"stored model metadata does not match mode={mode}, alpha={alpha}, seed={seed}: {path}")
-    torch.manual_seed(seed)
-    obj = S.Predictor(mode, md["mu"], md["sd"], md["pool"])
-    obj.load_state_dict(torch.load(path / "model.pt", map_location="cpu", weights_only=True))
-    obj.eval()
-    return (obj, C.sha256(path / "model.pt"))
 
 
 # All thresholds / models / Lambdas, read from earlier steps
 def load_models(S, smoke, ns, alphas, seeds):
-    fz = {"dbp": {"fixed": {}, "zc": {}, "models": {}}, "sscd": {"fixed": {}, "zc": {}, "models": {}}, "sources": {}}
+    fz = {"dbp": {"fixed": {}, "zc": {}, "models": {}}, "sources": {}}
     B = pd.read_parquet(C.arm_path(100, 0.95, baseline=True))
     for m in FIXED_DBP:
         t = B.loc[B.method == m, "tau"].unique()
@@ -128,7 +110,7 @@ def load_models(S, smoke, ns, alphas, seeds):
             raise ValueError(f"fixed rule {m} is not a single threshold")
         fz["dbp"]["fixed"][m] = float(t[0])
     hr = json.loads(C.stored(C.RESULTS / "hash_thresholds" / "hash_rule.json").read_text(encoding="utf-8"))
-    fz["dbp"]["fixed"]["Hash convention"] = float(hr["tau_grid"])
+    fz["dbp"]["fixed"]["Hash convention (10 bits)"] = float(hr["tau_grid"])
     fz["sources"]["dbp_fixed"] = [str(C.arm_path(100, 0.95, baseline=True)), str(C.stored(C.RESULTS / "hash_thresholds" / "hash_rule.json"))]
     a2 = json.loads(C.stored(C.RESULTS / "support_baselines" / "fitted_values.json").read_text(encoding="utf-8"))
     for e in a2:
@@ -146,37 +128,15 @@ def load_models(S, smoke, ns, alphas, seeds):
                         meta = json.loads(mp.read_text(encoding="utf-8-sig"))
                         lam[c] = float(meta["calibration"]["global"]["Lambda"])
                     fz["dbp"]["models"][n, a, mode, s] = (obj, lam)
-    sr = C.RESULTS / ("smoke" if smoke else "") / "sscd"
-    if not all((sr / f).is_file() for f in ("fixed_thresholds.json", "calibration.json", "summary.csv")):
-        raise FileNotFoundError(f"run the sscd step first ({sr})")
-    fz["sscd"]["fixed"] = json.loads((sr / "fixed_thresholds.json").read_text(encoding="utf-8"))["thresholds"]
-    cal = json.loads((sr / "calibration.json").read_text(encoding="utf-8"))
-    lam = {}
-    for e in cal:
-        if e["method"] == "Z-norm + NP rank":
-            fz["sscd"]["zc"][e["n"], e["alpha"]] = float(e["c"])
-        elif e["method"].startswith("Meta set + "):
-            lam[e["n"], e["alpha"], e["training_seed"], e["method"][len("Meta set + "):]] = float(e["Lambda"])
-    mroot = C.OUT_ROOT / "models_sscd_smoke" if smoke else C.ROOT / "models_sscd"
-    for n in ns:
-        for a in alphas:
-            for s in seeds:
-                obj, _ = load_model_dir(
-                    S,
-                    mroot / f"n{n}" / f"base_set__{C.VAR['base_set']}__a{a}__s{s}",
-                    "base_set",
-                    a,
-                    s,
-                )
-                fz["sscd"]["models"][n, a, "base_set", s] = (obj, {c: lam[n, a, s, c] for c in CALS if (n, a, s, c) in lam})
-    fz["sources"]["sscd"] = [str(sr / "fixed_thresholds.json"), str(sr / "calibration.json"), str(mroot)]
     return fz
 
 
 # Every method's threshold for one registry (decision S >= tau)
 def taus(S, fz, scheme, z_sup, M_eff, n, a, g):
-    up = (lambda u: C.succ(u, g)) if scheme == "dbp" else C.cont_succ
-    floor = float(np.min(np.diff(g))) if scheme == "dbp" else SD_FLOOR_SSCD
+    if scheme != "dbp":
+        raise ValueError("DISC21 evaluation uses DBpHash scores")
+    up = lambda u: C.succ(u, g)
+    floor = float(np.min(np.diff(g)))
     out = [(m, t, -1) for m, t in fz[scheme]["fixed"].items()]
     z = np.sort(np.asarray(z_sup, float)[:n])
     frac = S.FC.beta_fraction(a)
@@ -192,7 +152,7 @@ def taus(S, fz, scheme, z_sup, M_eff, n, a, g):
         if (nn, aa) != (n, a):
             continue
         q = C.predict(S, obj, d, a, mode, n)
-        name = DBP_MODES[mode] if scheme == "dbp" else "Meta set"
+        name = DBP_MODES[mode]
         for cal, L in lam.items():
             out.append((f"{name} + {cal}", up(S.FC.corrected_boundary(q, L)), s))
     return out
@@ -241,7 +201,7 @@ PROTOCOL = {
     "risk_metric": "V",
     "comparison_metric": "passing",
     "split_reused": True,
-    "reference_methods": {"dbp": "DBpHash fixed", "sscd": "Equal error rate"},
+    "reference_methods": {"dbp": "DBpHash fixed"},
 }
 
 
@@ -260,10 +220,8 @@ def main(args, out):
         out / "model_inputs.json",
         {
             "dbp_fixed": fz["dbp"]["fixed"],
-            "sscd_fixed": fz["sscd"]["fixed"],
             "dbp_znorm_c": {f"n{k[0]}_a{k[1]}": v for k, v in fz["dbp"]["zc"].items()},
-            "sscd_znorm_c": {f"n{k[0]}_a{k[1]}": v for k, v in fz["sscd"]["zc"].items()},
-            "lambdas": {f"{sc}_n{k[0]}_a{k[1]}_{k[2]}_s{k[3]}": v[1] for sc in ("dbp", "sscd") for k, v in fz[sc]["models"].items()},
+            "lambdas": {f"{sc}_n{k[0]}_a{k[1]}_{k[2]}_s{k[3]}": v[1] for sc in ("dbp",) for k, v in fz[sc]["models"].items()},
             "sources": fz["sources"],
         },
     )
@@ -288,8 +246,7 @@ def main(args, out):
             rows, keep = ([], {})
             for kind, R in regs.items():
                 Zd = S.SIM.query_max(F["q_mid"][qidx], F["q_high"][qidx], F["r_mid"][R], F["r_high"][R])["Z"]
-                Zs = C.max_cos(F["q_emb"][qidx], F["r_emb"][R])
-                for scheme, Z, base_name in (("dbp", Zd, "DBpHash fixed"), ("sscd", Zs, "Equal error rate")):
+                for scheme, Z, base_name in (("dbp", Zd, "DBpHash fixed"),):
                     z_sup, z_ev, z_pos = (Z[:ns_], Z[ns_:ns_ + ne_], Z[ns_ + ne_:])
                     keep[f"{scheme}_{kind}"] = Z
                     for n in ns:
@@ -336,7 +293,7 @@ def main(args, out):
     summ = C.method_summary(cond, by=("scheme", "method", "n", "alpha"))
     C.save_csv(summ, out / "summary.csv")
     j = []
-    for scheme, tag, ref in (("dbp", "", "DBpHash fixed"), ("sscd", "s", "Equal error rate")):
+    for scheme, tag, ref in (("dbp", "", "DBpHash fixed"),):
         sm = summ[summ.scheme == scheme].set_index(["method", "n", "alpha"])
         for n in ns:
             for a in alphas:
@@ -367,11 +324,10 @@ def main(args, out):
     res = {
         "results": j,
         "dbp_pass": ok("dbp"),
-        "sscd_pass": ok("sscd"),
         "smoke": smoke,
         "synthetic_features": F["synthetic"],
     }
 
-    return {"dbp_pass": res["dbp_pass"], "sscd_pass": res["sscd_pass"], "smoke": smoke}
+    return {"dbp_pass": res["dbp_pass"], "smoke": smoke}
 if __name__ == "__main__":
     C.run_step("disc21", "DISC21 공식 ground truth 외부 시험", main)

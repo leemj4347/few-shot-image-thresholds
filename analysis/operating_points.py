@@ -83,8 +83,8 @@ for n in [10, 20, 50, 100]:
                 maxerr = max(maxerr, abs(ev['FAR'] - rr['FAR']), abs(ev['TPR23'] - rr['TPR23']))
             assert maxerr < 1e-12
             repro.append({'method': method, 'n': n, 'alpha': alpha, 'seed': seed, 'max_recalculation_error': maxerr})
-            for target_metric in ['FAR', 'V']:
-                target = alpha if target_metric == 'FAR' else 0.05
+            for target_metric in ['V']:
+                target = 0.05
                 lo = -2.0
                 hi = 2.0
                 assert dev_risk(bd, lo, alpha, target_metric) > target and dev_risk(bd, hi, alpha, target_metric) <= target

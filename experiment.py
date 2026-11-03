@@ -31,8 +31,8 @@ INPUTS = ROOT / 'data' / 'inputs'
 FISCH_SOURCE = ROOT / 'external' / 'fisch' / 'mini_imagenet' / 'quantile_snn.py'
 FISCH_HASH = ROOT / 'external' / 'fisch' / 'source_hashes.json'
 SEEDS = (42, 43, 44, 45, 46)
-VAR = {'base_set': 'normalized15', 'base_summary256': 'raw15', 'base_summarymatched': 'raw15'}
-METHODS = {'base_set': 'Meta set', 'base_summary256': 'Summary H256', 'base_summarymatched': 'Summary H440'}
+VAR = {'base_set': 'normalized15', 'base_summary256': 'raw15'}
+METHODS = {'base_set': 'Meta set', 'base_summary256': 'Summary H256'}
 K = ['domain', 'structure', 'kind', 'M', 'scheme', 'n', 'alpha', 'beta', 'method', 'training_seed', 'boundary_case']
 TASK_KEY = ['domain', 'structure', 'kind', 'M', 'seed']
 DELTA = 0.05
@@ -106,7 +106,7 @@ def runner():
         import predictor as S
         S.X.DEFAULT = REFERENCE
         import importlib
-        for _name in ('meta_quantile', 'registry_predictor', 'conditional_predictor'):
+        for _name in ('conditional_predictor',):
             _mod = importlib.import_module('methods.' + _name)
             _mod.SOURCE = FISCH_SOURCE
             _mod.HASH_FILE = FISCH_HASH

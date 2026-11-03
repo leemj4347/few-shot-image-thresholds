@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import similarity as SIM
 
-GAMMA_REF = 0.6307636
+GAMMA_REF = 0.63075
 HASH_CONVENTION_BITS = 10
 PHOTO = ("gaussian", "jpeg", "median")
 

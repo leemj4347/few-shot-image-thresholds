@@ -189,7 +189,6 @@ def build_cache(dataset: str, root: str, out: str, list_file=None, meta_csv=None
                 collection_col=None, mint_col=None, workers=1, chunk=5000, max_seconds: float | None = None) -> pd.DataFrame:
     meta = pd.read_csv(meta_csv, dtype=str) if meta_csv else None
     rels = list_files(root, list_file, meta, file_col)
-    print(f"[{dataset}] files: {len(rels)}", flush=True)
     if not rels: raise ValueError(f"[{dataset}] no image files under {root}")
 
     manifest = {"dataset": dataset, "root": os.path.abspath(root), "chunk": chunk, "n": len(rels),
@@ -206,14 +205,12 @@ def build_cache(dataset: str, root: str, out: str, list_file=None, meta_csv=None
         tasks = [(c0 + i, root, r) for i, r in enumerate(rels[c0:c0 + chunk])]
         rows, ndone = _chunk_rows(part_dir, c0, tasks, hash_one, workers, 64, False, t0, max_seconds, sub=25)
         if rows is None:
-            print(f"  시간 예산 도달 — {c0 + ndone}/{len(rels)}까지 저장하고 종료(이어서 실행할 것)", flush=True)
             sys.exit(PARTIAL_EXIT)
         pd.DataFrame(rows).to_parquet(pf, index=False)
         parts.append(pf)
         done = min(c0 + chunk, len(rels))
         pass
         if max_seconds and time.time() - t0 > max_seconds and done < len(rels):
-            print(f"  시간 예산 도달 — {done}/{len(rels)}까지 저장하고 종료(이어서 실행할 것)", flush=True)
             sys.exit(PARTIAL_EXIT)
     df = pd.concat([pd.read_parquet(p) for p in parts], ignore_index=True)
     df["dataset"] = dataset
@@ -243,7 +240,6 @@ def build_cache(dataset: str, root: str, out: str, list_file=None, meta_csv=None
     df.to_parquet(out, index=False)
     n_ok = int(df.ok.sum())
     n_grp = df.loc[df.ok, "group_id"].nunique()
-    print(f"[{dataset}] ok {n_ok}/{len(df)}  groups {n_grp}  reps {int(df.is_rep.sum())}  → {out}", flush=True)
     return df
 
 
@@ -270,14 +266,12 @@ def build_variants(cache_parquet: str, root: str, out: str, only_reps=True, limi
         tasks = [(c0 + i, root, r, variant_seed(r)) for i, r in enumerate(files[c0:c0 + chunk])]
         rows, ndone = _chunk_rows(part_dir, c0, tasks, variants_one, workers, 8, True, t0, max_seconds, sub=8)
         if rows is None:
-            print(f"  시간 예산 도달 — {c0 + ndone}/{len(files)}까지 저장하고 종료(이어서 실행할 것)", flush=True)
             sys.exit(PARTIAL_EXIT)
         pd.DataFrame(rows).to_parquet(pf, index=False)
         parts.append(pf)
         done = min(c0 + chunk, len(files))
         pass
         if max_seconds and time.time() - t0 > max_seconds and done < len(files):
-            print(f"  시간 예산 도달 — {done}/{len(files)}까지 저장하고 종료(이어서 실행할 것)", flush=True)
             sys.exit(PARTIAL_EXIT)
     v = pd.concat([pd.read_parquet(p) for p in parts], ignore_index=True) if parts else pd.DataFrame()
     inherit = base[["file", "dataset", "group_id", "is_rep", "collection", "mint_time", "w", "h"]]
@@ -287,7 +281,6 @@ def build_variants(cache_parquet: str, root: str, out: str, only_reps=True, limi
     for c in ("mid_u64", "high_u64", "phash_u64"): v[c] = v[c].astype("uint64")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     v.to_parquet(out, index=False)
-    print(f"[variants] {len(base)} originals × {len(ATTACKS)} → {len(v)} rows → {out}", flush=True)
     return v
 
 

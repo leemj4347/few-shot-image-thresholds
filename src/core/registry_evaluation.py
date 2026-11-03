@@ -22,7 +22,6 @@ MIN_TASKS = 36
 MIN_DET_TASKS = 10
 
 
-TPR_REQ_LEGACY = {0.05: 0.85, 0.01: 0.70}
 
 
 COND_KEYS = ["domain", "structure", "kind", "M", "alpha"]
@@ -136,8 +135,8 @@ def score_all(bundles: list, cfg: dict, scheme: str, included: dict | None, log=
         fixed_taus["등오류율 고정"] = MF.fit_C0eer(d0, gen, grid)
         fixed_taus["Youden J 고정"] = MF.fit_C0j(d0, gen, grid)
         fixed_taus["Otsu 고정"] = MF.fit_C0otsu(d0, gen, grid)
-    fixed_taus["원문 식 28"] = SIM.grid_ceil(MF.GAMMA_REF, w) if scheme == "dbp" else float("nan")
-    fixed_taus["해밍 관행값"] = MF.fit_C0h(w)
+    fixed_taus[CR.BASELINE_METHOD] = SIM.grid_ceil(MF.GAMMA_REF, w) if scheme == "dbp" else float("nan")
+    fixed_taus[CR.HASH_METHOD] = MF.fit_C0h(w)
     dom_taus = {dom: MF.fit_C1(dev, dom) for dom in cfg["domains"]} if dev else {}
 
 
@@ -400,7 +399,7 @@ def gate(cond: pd.DataFrame, kinds=("base", "grow_i", "grow_ii")) -> dict:
     elif passed:
         out["verdict"] = "충족: " + ", ".join(passed)
     else:
-        out["verdict"] = "미충족: 미달 조건을 다음 평가의 개발 목표로 둔다"
+        out["verdict"] = "미충족"
         for key, s in d.groupby(COND_KEYS):
             s2 = s.sort_values("V")
             best = s2.iloc[0]

@@ -11,7 +11,7 @@ from fractions import Fraction
 from scipy.stats import binom, t
 import task_io as X, registry_evaluation as R
 import similarity as SIM, evaluate_registry as EV, criteria as CR
-from methods import registry_predictor as F1, conditional_predictor as F, calibration as FC
+from methods import conditional_predictor as F, calibration as FC
 torch.set_num_threads(1)
 CACHE = ROOT / "models"
 _CREATED_MODELS = set()
@@ -33,18 +33,19 @@ class Predictor(nn.Module):
         super().__init__()
         self.mode = mode
         self.pool = pool
-        self.head = F1.make_head("set_plain", 256) if mode == "set_plain" else F.make_head(mode, F.MODES[mode])
+        if mode not in F.MODES or pool != "mean":
+            raise ValueError("Expected a paper model with mean pooling")
+        self.head = F.make_head(mode, F.MODES[mode])
         self.register_buffer("mu", torch.as_tensor(mu, dtype=torch.float32))
         self.register_buffer("sd", torch.as_tensor(sd, dtype=torch.float32))
         self.register_buffer("affine", torch.tensor([0.0, 1.0]))
 
     def forward(self, x):
         v = (x - self.mu) / self.sd
-        if self.mode.endswith("_set") or self.mode == "set_plain":
+        if self.mode.endswith("_set"):
             e = self.head.embedder(v[:, :, :1])
-            h = e.mean(1) if self.pool == "mean" else e.sum(1)
-            if self.mode != "set_plain":
-                h = torch.cat((h, v[:, 0, 1:]), 1)
+            h = e.mean(1)
+            h = torch.cat((h, v[:, 0, 1:]), 1)
             y = self.head.combiner(h).reshape(-1)
         else:
             y = self.head(v).reshape(-1)
@@ -52,8 +53,6 @@ class Predictor(nn.Module):
 
 
 def encode(d, alpha, mode, domain):
-    if mode == "set_plain":
-        return F1.encode_input(d["Z_sup"], 100, d["M"], alpha, "set_plain")
     return F.encode_input(d["Z_sup"], 100, d["M"], alpha, mode, domain, d.get("hist_sup"))
 
 
@@ -65,7 +64,7 @@ def arrays(bs, alpha, mode):
 
 
 def normalize(x, mode):
-    if mode.endswith("_set") or mode == "set_plain":
+    if mode.endswith("_set"):
         mu = torch.zeros(x.shape[-1])
         sd = torch.ones(x.shape[-1])
         mu[0] = x[:, :, 0].mean()
@@ -82,6 +81,8 @@ def predict(obj, d, a, mode, domain):
 
 
 def model(mode, variant, alpha, seed, fit, dev, progress=None):
+    if mode not in F.MODES or variant not in ("raw15", "normalized15"):
+        raise ValueError("Unknown model or input normalization")
     path = CACHE / f"{mode}__{variant}__a{alpha}__s{seed}"
     path.mkdir(parents=True, exist_ok=True)
     pt = path / "model.pt"
@@ -93,61 +94,44 @@ def model(mode, variant, alpha, seed, fit, dev, progress=None):
         xv, yv, devbs = arrays(dev, alpha, mode)
         torch.manual_seed(seed)
         mu, sd = normalize(x, mode) if variant.startswith("normalized") else (torch.zeros(x.shape[-1]), torch.ones(x.shape[-1]))
-        obj = Predictor(mode, mu, sd, "sum" if variant.startswith("sum") else "mean")
-        epochs = 400 if variant.endswith("400") else 15
+        obj = Predictor(mode, mu, sd, "mean")
+        epochs = 15
         old = None
         reused = False
-        if variant == "affine":
-            raw, source, _ = model(mode, "raw15", alpha, seed, fit, dev, progress)
-            obj = copy.deepcopy(raw)
+        opt = torch.optim.Adam(obj.parameters(), lr=0.001)
+        sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.1, patience=2, min_lr=1e-06)
+        dl = torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(x, y),
+            batch_size=64,
+            shuffle=True,
+            generator=torch.Generator().manual_seed(seed),
+            num_workers=0,
+        )
+        best = math.inf
+        best_state = None
+        best_epoch = 0
+        history = []
+        for epoch in range(1, epochs + 1):
+            obj.train()
+            total = 0
+            lr = opt.param_groups[0]["lr"]
+            for xb, yb in dl:
+                opt.zero_grad()
+                loss = ((obj(xb) - yb) ** 2).mean()
+                assert torch.isfinite(loss)
+                loss.backward()
+                opt.step()
+                total += float(loss.detach()) * len(yb)
+            obj.eval()
             with torch.no_grad():
-                pp = obj(x).numpy().astype(float)
-            yy = y.numpy().astype(float)
-            v = pp - pp.mean()
-            den = v @ v
-            if den <= 0:
-                raise ValueError("Affine degeneracy")
-            slope = float(v @ (yy - yy.mean()) / den)
-            if slope <= 0:
-                raise ValueError("Affine not order preserving")
-            obj.affine.copy_(torch.tensor([yy.mean() - slope * pp.mean(), slope]))
-            history = source["history"]
-            best_epoch = source["best_epoch"]
-        else:
-            opt = torch.optim.Adam(obj.parameters(), lr=0.001)
-            sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.1, patience=2, min_lr=1e-06)
-            dl = torch.utils.data.DataLoader(
-                torch.utils.data.TensorDataset(x, y),
-                batch_size=64,
-                shuffle=True,
-                generator=torch.Generator().manual_seed(seed),
-                num_workers=0,
-            )
-            best = math.inf
-            best_state = None
-            best_epoch = 0
-            history = []
-            for epoch in range(1, epochs + 1):
-                obj.train()
-                total = 0
-                lr = opt.param_groups[0]["lr"]
-                for xb, yb in dl:
-                    opt.zero_grad()
-                    loss = ((obj(xb) - yb) ** 2).mean()
-                    assert torch.isfinite(loss)
-                    loss.backward()
-                    opt.step()
-                    total += float(loss.detach()) * len(yb)
-                obj.eval()
-                with torch.no_grad():
-                    vl = float(((obj(xv) - yv) ** 2).mean())
-                history.append(dict(epoch=epoch, train_mse=total / len(y), validation_mse=vl, lr=lr))
-                if vl < best:
-                    best = vl
-                    best_epoch = epoch
-                    best_state = copy.deepcopy(obj.state_dict())
-                sched.step(vl)
-            obj.load_state_dict(best_state)
+                vl = float(((obj(xv) - yv) ** 2).mean())
+            history.append(dict(epoch=epoch, train_mse=total / len(y), validation_mse=vl, lr=lr))
+            if vl < best:
+                best = vl
+                best_epoch = epoch
+                best_state = copy.deepcopy(obj.state_dict())
+            sched.step(vl)
+        obj.load_state_dict(best_state)
         obj.eval()
         with torch.no_grad():
             vl = float(((obj(xv) - yv) ** 2).mean())

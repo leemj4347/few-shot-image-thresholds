@@ -22,8 +22,8 @@ def task_token(key):
 def build(args, out):
     S, MF, T, REG = C.modules()
     scheme = args.scheme
-    if scheme not in REG.SCHEMES or scheme == "dbp":
-        raise ValueError("scheme must be phash or iphash")
+    if scheme != "phash":
+        raise ValueError("scheme must be phash")
 
     _, m, cfg = S.X.reference_inputs(S.X.DEFAULT)
 
