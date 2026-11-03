@@ -34,7 +34,6 @@ def build(args, out):
     if args.smoke:
         keys = [k for r in ("train", "dev", "test") for k in [x for x in keys if x[0] == r][:3]]
 
-    None.set_total("bundles", len(keys))
     root = Path(cfg["root"])
     table = T.load_role_table(m["role_table"])
 
@@ -173,7 +172,6 @@ def run(args, out):
                 for name, tau in taus.items():
                     rows.append(C.row(b, k, d, tau, n, a, name, names, scheme=scheme))
 
-    S.old_source = lambda *x: None
     cal_info = []
     for n in ns:
         S.CACHE = C.output_path((C.OUT_ROOT / f"models_{scheme}_smoke" if args.smoke else C.ROOT / f"models_{scheme}") / f"n{n}")

@@ -136,7 +136,7 @@ def main(args, out):
     dest = C.output_path(C.OUT_ROOT / "data" / "hashes_smoke" if smoke else C.ROOT / "data" / "hashes")
     dest.mkdir(parents=True, exist_ok=True)
     parts = C.output_path(C.OUT_ROOT / "data" / "rehash_parts_smoke" if smoke else C.ROOT / "data" / "rehash_parts")
-    names = ["nft", "nft_var3"] if smoke else [None + s for p in POOLS for s in SUFFIX]
+    names = ["nft", "nft_var3"] if smoke else [p + s for p in POOLS for s in SUFFIX]
     root_of = lambda n: C.ROOTS[n.replace("_var3", "").replace("_var", "")]
     total = 0
     for n in names:

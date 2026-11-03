@@ -156,7 +156,6 @@ def main(args, out):
     if args.smoke:
         keys = [k for r in ("train", "dev", "test") for k in [x for x in keys if x[0] == r][:3]]
 
-    None.set_total("bundles", len(keys))
     root = Path(cfg["root"])
     table = T.load_role_table(m["role_table"])
     pools, variants = ({}, {})

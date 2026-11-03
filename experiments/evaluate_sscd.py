@@ -121,7 +121,6 @@ def main(args, out):
                 for name, tau in taus.items():
                     rows.append(C.row(b, k, d, tau, n, a, name, names, scheme="sscd"))
 
-    S.old_source = lambda *x: None
     for n in ns:
         S.CACHE = C.output_path((C.OUT_ROOT / "models_sscd_smoke" if args.smoke else C.ROOT / "models_sscd") / f"n{n}")
         S.encode = (lambda nn: lambda d, a, mode, domain: C.encode(S, d, a, mode, nn))(n)
