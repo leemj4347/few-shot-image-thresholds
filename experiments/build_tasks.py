@@ -52,4 +52,4 @@ def main(args, out):
 
 
 if __name__ == "__main__":
-    C.run_step("tasks", "태스크 구성", main)
+    C.run_step("tasks", "Build tasks", main)

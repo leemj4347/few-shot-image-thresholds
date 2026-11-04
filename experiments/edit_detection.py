@@ -38,4 +38,4 @@ def main(args, out):
 
 
 if __name__ == "__main__":
-    C.run_step("edit_detection", "편집 종류별 검출률", main)
+    C.run_step("edit_detection", "Detection by edit type", main)

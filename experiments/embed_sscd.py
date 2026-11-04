@@ -109,4 +109,4 @@ def main(args, out):
         "runtime": rt,
     }
 if __name__ == "__main__":
-    C.run_step("sscd_embeddings", "SSCD 임베딩(원본·편집 재생성)", main)
+    C.run_step("sscd_embeddings", "Compute SSCD embeddings", main)

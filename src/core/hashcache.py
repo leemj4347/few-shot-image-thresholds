@@ -296,15 +296,15 @@ if __name__ == "__main__":
     ap.add_argument("--mint-col")
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--chunk", type=int, default=5000)
-    ap.add_argument("--variants", help="캐시 parquet 경로: 이 캐시의 대표 원본에 변형 5종을 적용")
+    ap.add_argument("--variants", help="Cache parquet path; apply five edits to representative originals")
     ap.add_argument("--limit", type=int)
-    ap.add_argument("--all-files", action="store_true", help="변형: 대표뿐 아니라 전체")
-    ap.add_argument("--max-seconds", type=float, help="이 시간을 넘기면 완료된 부분까지 저장하고 종료 코드 75로 나간다")
+    ap.add_argument("--all-files", action="store_true", help="Apply edits to all images")
+    ap.add_argument("--max-seconds", type=float, help="Save completed work after this time limit and exit with code 75")
     a = ap.parse_args()
     if a.variants:
         build_variants(a.variants, a.root, a.out, only_reps=not a.all_files, limit=a.limit, workers=a.workers,
                        chunk=a.chunk if a.chunk != 5000 else 300, max_seconds=a.max_seconds)
     else:
-        assert a.dataset, "--dataset 필요"
+        assert a.dataset, "--dataset is required"
         build_cache(a.dataset, a.root, a.out, a.list, a.meta, a.file_col, a.collection_col, a.mint_col, a.workers,
                     a.chunk, a.max_seconds)

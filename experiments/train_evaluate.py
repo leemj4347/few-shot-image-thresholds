@@ -234,4 +234,4 @@ def main(args, out):
 
     return {"conditions": int(len(d)), "fixed_thresholds": fixed, "selection_lower_dev_mse": choice}
 if __name__ == "__main__":
-    C.run_step("main", "본 실험 학습·보정·평가", main)
+    C.run_step("main", "Train, calibrate and evaluate", main)

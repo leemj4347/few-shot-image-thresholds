@@ -69,7 +69,7 @@ SPEC_VERSION = SPEC_VERSIONS[SPEC_CHOICE]
 # Edited image for one edit name
 def apply2(img_bgr: np.ndarray, name: str, rng: np.random.Generator) -> np.ndarray:
     if name not in BY_NAME:
-        raise ValueError(f"모르는 변형: {name}")
+        raise ValueError(f"Unknown edit: {name}")
     _, fam, p = BY_NAME[name]
     h, w = img_bgr.shape[:2]
 
@@ -81,7 +81,7 @@ def apply2(img_bgr: np.ndarray, name: str, rng: np.random.Generator) -> np.ndarr
     if fam == "jpeg":
         ok, buf = cv2.imencode(".jpg", img_bgr, [cv2.IMWRITE_JPEG_QUALITY, int(p["q"])])
         if not ok:
-            raise RuntimeError("jpeg 인코딩 실패")
+            raise RuntimeError("JPEG encoding failed")
         return cv2.imdecode(buf, cv2.IMREAD_COLOR)
 
     if fam == "median":

@@ -168,4 +168,4 @@ def main(args, out):
 
     return {"judgment": j}
 if __name__ == "__main__":
-    C.run_step("sscd", "SSCD 학습·보정·평가", main)
+    C.run_step("sscd", "Train and evaluate SSCD thresholds", main)

@@ -8,7 +8,7 @@ param(
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Py = Join-Path $Root '.venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $Py)) { throw "환경 없음: $Py  (먼저 setup_env.ps1 실행)" }
+if (-not (Test-Path -LiteralPath $Py)) { throw "Python environment missing: $Py; run setup_env.ps1 first" }
 $env:PYTHONIOENCODING = 'utf-8'; $env:PYTHONUNBUFFERED = '1'; $env:PYTHONDONTWRITEBYTECODE = '1'; $env:SSCD_DEVICE = 'cuda'
 if ($RunRoot) { $RunRoot = [IO.Path]::GetFullPath((Join-Path $Root $RunRoot)); $env:RUN_ROOT = $RunRoot } else { Remove-Item Env:RUN_ROOT -ErrorAction SilentlyContinue }
 

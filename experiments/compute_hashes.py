@@ -167,4 +167,4 @@ def main(args, out):
 
 
 if __name__ == "__main__":
-    C.run_step("hashes", "해시 계산(DBpHash·pHash)", main)
+    C.run_step("hashes", "Compute DBpHash and pHash", main)

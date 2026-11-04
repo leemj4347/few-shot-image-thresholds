@@ -42,4 +42,4 @@ def main(args, out):
 
 
 if __name__ == "__main__":
-    C.run_step("sscd_download", "SSCD 가중치 받기·확인", main)
+    C.run_step("sscd_download", "Download SSCD weights", main)

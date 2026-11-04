@@ -219,4 +219,4 @@ def main(args, out):
 if __name__ == "__main__":
     import sys
     part = "build" if "--part" in sys.argv and sys.argv[sys.argv.index("--part") + 1] == "build" else "run"
-    C.run_step("phash_build" if part == "build" else "phash", "pHash 반복 실험", main)
+    C.run_step("phash_build" if part == "build" else "phash", "pHash experiments", main)

@@ -1,4 +1,4 @@
-# Confidence intervals, binomial upper bounds and paired tests
+# Bootstrap intervals and paired tests
 from __future__ import annotations
 import numpy as np, pandas as pd
 from scipy.stats import wilcoxon
@@ -77,7 +77,7 @@ def main(args, out):
     ns = (100,) if args.smoke else NS
 
     rng = np.random.default_rng(20261016)
-    ci_rows, diff_rows, cp_rows, test_rows = [], [], [], []
+    ci_rows, diff_rows, test_rows = [], [], []
     for n in ns:
         for a in ALPHAS:
             mats, conds, base, A = arrays(load(n, a, args.smoke))
@@ -109,16 +109,6 @@ def main(args, out):
                                               estimate=float(point[PROPOSED][k][0] - point[cmp][k][0]),
                                               ci_low=float(lo), ci_high=float(hi), draws=B))
 
-            for m, g in A.groupby("method"):
-                z = g[(g.FAR == 0) & (~g.sentinel)]
-                ub = 1.0 - 0.05 ** (1.0 / z.n_eval.to_numpy()) if len(z) else np.array([])
-                cp_rows.append(dict(n=n, alpha=a, method=m, rows=len(g), zero_far_rows=len(z),
-                                    sentinel_rows=int(g.sentinel.sum()),
-                                    ub95_median=float(np.median(ub)) if len(ub) else np.nan,
-                                    ub95_max=float(np.max(ub)) if len(ub) else np.nan,
-                                    share_ub_le_alpha=float(np.mean(ub <= a)) if len(ub) else np.nan))
-
-
             if PROPOSED in mats:
                 for cmp in COMPARE:
                     if cmp not in mats: continue
@@ -145,10 +135,9 @@ def main(args, out):
         T["p_holm"] = adj
     C.save_csv(pd.DataFrame(ci_rows), out / "C1_bootstrap_ci.csv")
     C.save_csv(pd.DataFrame(diff_rows), out / "C1_paired_differences_ci.csv")
-    C.save_csv(pd.DataFrame(cp_rows), out / "C2_zero_far_upper_bound.csv")
     C.save_csv(T, out / "C3_paired_tests.csv")
     return {"bootstrap_draws": B, "ci_rows": len(ci_rows), "tests": len(test_rows)}
 
 
 if __name__ == "__main__":
-    C.run_step("statistics", "신뢰구간·이항 상한·짝 검정", main)
+    C.run_step("statistics", "Bootstrap intervals and paired tests", main)

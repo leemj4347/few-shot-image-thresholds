@@ -141,7 +141,7 @@ class Registry:
     # (i) Same composition, larger M
     def grow(self, M_new: int, seed: int | None = None):
         assert M_new >= self.M
-        if self.structure.endswith("+new"): raise ValueError("유입본(+new)은 성장 (i)의 출발점이 아님")
+        if self.structure.endswith("+new"): raise ValueError("An inflow registry (+new) cannot initialize growth (i)")
         seed = self.seed if seed is None else seed
         if self.structure in ("random",) or not self.pool.has_coll:
             extra = Registry.sample(

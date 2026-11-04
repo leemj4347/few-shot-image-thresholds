@@ -1,4 +1,4 @@
-# Fixed and development-fitted threshold rules
+# Fixed and development-fitted thresholds
 from __future__ import annotations
 import numpy as np
 import similarity as SIM
@@ -8,7 +8,6 @@ HASH_CONVENTION_BITS = 10
 PHOTO = ("gaussian", "jpeg", "median")
 
 
-# F0 from the support pair counts of the development bundles
 def dev_pair_hist(bundles, equal_weight_by_domain: bool = True) -> SIM.GridDist:
     by_dom = {}
     for b in bundles:
@@ -25,41 +24,11 @@ def dev_pair_hist(bundles, equal_weight_by_domain: bool = True) -> SIM.GridDist:
     return SIM.GridDist(Hn * 1e9, w=bundles[0].w)
 
 
-# Development bundles -> (impostor pair GridDist, genuine pair scores)
 def dev_pair_scores(bundles):
     d0 = dev_pair_hist(bundles)
     gen = np.concatenate([b.S_gen[np.isin(b.gen_variant, PHOTO)] for b in bundles if len(b.S_gen)]) \
         if any(len(b.S_gen) for b in bundles) else np.zeros(0)
     return d0, gen
-
-
-# Development bundles -> (normal query Z, photometric positive Z)
-def dev_query_scores(bundles):
-    neg = np.concatenate([b.reg["base"]["Z_eval"] for b in bundles]) if bundles else np.zeros(0)
-    pos = np.concatenate([b.reg["base"]["Z_pos"][np.isin(b.reg["base"]["pos_variant"], PHOTO)]
-                          for b in bundles if len(b.reg["base"]["Z_pos"])]) if bundles else np.zeros(0)
-    return neg, pos
-
-
-def _ba_argmax(neg, pos, grid):
-    if len(neg) == 0 or len(pos) == 0: return float("nan")
-    ns = np.sort(neg)
-    ps = np.sort(pos)
-    far = 1.0 - np.searchsorted(ns, grid - SIM.TOL, side="left") / len(ns)
-    tpr = 1.0 - np.searchsorted(ps, grid - SIM.TOL, side="left") / len(ps)
-    return float(grid[int(np.argmax(0.5 * (tpr + 1.0 - far)))])
-
-
-# Query-level BA maximum over all development data
-def fit_C0g(dev_bundles) -> float:
-    neg, pos = dev_query_scores(dev_bundles)
-    return _ba_argmax(neg, pos, SIM.grid_values(dev_bundles[0].w))
-
-
-# Per-domain refit
-def fit_C1(dev_bundles, domain: str) -> float:
-    sub = [b for b in dev_bundles if b.domain == domain]
-    return fit_C0g(sub) if sub else float("nan")
 
 
 def _pair_curves(d0: SIM.GridDist, gen: np.ndarray, grid: np.ndarray):
@@ -79,7 +48,6 @@ def fit_C0j(d0, gen, grid) -> float:
     return float(grid[int(np.argmax(tpr - fpr))])
 
 
-# Otsu threshold on the pooled genuine/impostor score histogram
 def fit_C0otsu(d0: SIM.GridDist, gen: np.ndarray, grid) -> float:
     v = d0.v
     w0 = d0.c / max(d0.c.sum(), 1)
@@ -102,11 +70,5 @@ def fit_C0otsu(d0: SIM.GridDist, gen: np.ndarray, grid) -> float:
     return float(v[i])
 
 
-# Hash convention: Hamming distance <= 10 bits
 def fit_C0h(w=None) -> float:
     return SIM.grid_ceil(1.0 - HASH_CONVENTION_BITS / 64.0, w or SIM.W_FIXED)
-
-
-# Global scale correction
-def tau_C0s(d0: SIM.GridDist, M: int, alpha: float) -> float:
-    return SIM.tau_iid(d0, M, alpha)

@@ -118,4 +118,4 @@ def main(args, out):
         "registries": len(regs),
     }
 if __name__ == "__main__":
-    C.run_step("hash_thresholds", "Hamming 관행값과 FAR 예산", main)
+    C.run_step("hash_thresholds", "Hamming threshold and FAR budget", main)

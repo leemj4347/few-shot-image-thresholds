@@ -115,4 +115,4 @@ def main(args, out):
             "unreadable_queries": int((~qs.ok).sum())}
 
 if __name__ == "__main__":
-    C.run_step("disc21_prepare", "DISC21 외부 시험 해시", main)
+    C.run_step("disc21_prepare", "Compute DISC21 hashes", main)

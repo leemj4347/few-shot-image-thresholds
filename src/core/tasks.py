@@ -289,7 +289,7 @@ def roles_from_table(pool: Pool, table: dict) -> dict:
     keys = np.unique(split_keys(pool))
     missing = [k for k in keys if k not in table]
     if missing:
-        raise RuntimeError(f"역할표에 없는 키 {len(missing)}개 (예: {missing[:3]})")
+        raise RuntimeError(f"Role table missing {len(missing)} keys (e.g. {missing[:3]})")
     out = {r: set() for r in ROLES}
     for k in keys:
         out[table[k]].add(k)

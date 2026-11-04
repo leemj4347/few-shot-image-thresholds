@@ -220,4 +220,4 @@ def main(args, out):
 
     return {"scheme": "sscd", "tasks": len(keys), "cache": str(folder)}
 if __name__ == "__main__":
-    C.run_step("sscd_build", "SSCD 태스크 생성", main)
+    C.run_step("sscd_build", "Build SSCD tasks", main)

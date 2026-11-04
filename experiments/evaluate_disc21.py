@@ -330,4 +330,4 @@ def main(args, out):
 
     return {"dbp_pass": res["dbp_pass"], "smoke": smoke}
 if __name__ == "__main__":
-    C.run_step("disc21", "DISC21 공식 ground truth 외부 시험", main)
+    C.run_step("disc21", "Evaluate DISC21 ground truth", main)

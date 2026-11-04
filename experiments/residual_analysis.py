@@ -69,4 +69,4 @@ def main(args, out):
 
 
 if __name__ == "__main__":
-    C.run_step("residuals", "잔차 분포와 교환가능성 점검", main)
+    C.run_step("residuals", "Residual distributions", main)

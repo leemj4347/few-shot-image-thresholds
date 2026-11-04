@@ -147,4 +147,4 @@ def main(args, out):
     result['elapsed_s'] = round(time.time() - t_start, 1)
     return result
 if __name__ == '__main__':
-    C.run_step('coverage', '명목 수준 99개 (n = 100, 추가 분석)', main)
+    C.run_step('coverage', '99 nominal levels (n = 100)', main)
