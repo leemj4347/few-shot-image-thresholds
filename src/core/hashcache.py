@@ -102,7 +102,7 @@ def variant_seed(rel: str) -> int:
     return int(hashlib.sha256(rel.replace("\\", "/").encode("utf-8")).hexdigest()[:8], 16)
 
 
-# (idx, root, rel, seed) -> hash rows of the five PRIMARY edits
+# (idx, root, rel, seed) -> hash rows of the five DBpHash reference edits
 def variants_one(args):
     idx, root, rel, seed = args
     img = load_bgr(os.path.join(root, rel))
@@ -241,7 +241,7 @@ def build_cache(dataset: str, root: str, out: str, list_file=None, meta_csv=None
     return df
 
 
-# Apply the five PRIMARY edits to cached originals and hash them
+# Apply the five DBpHash reference edits to cached originals and hash them
 def build_variants(cache_parquet: str, root: str, out: str, only_reps=True, limit=None, workers=1,
                    chunk: int = 300, max_seconds: float | None = None) -> pd.DataFrame:
     base = pd.read_parquet(cache_parquet)

@@ -92,9 +92,9 @@ def prepare(S, p, out):
     grid = S.SIM.grid_values()
     fixed = {
         "DBpHash fixed": S.SIM.grid_ceil(0.63075),
-        "Youden J": MF.fit_C0j(d0, gen, grid),
-        "Equal error rate": MF.fit_C0eer(d0, gen, grid),
-        "Otsu": MF.fit_C0otsu(d0, gen, grid),
+        "Youden J": MF.fit_youden(d0, gen, grid),
+        "Equal error rate": MF.fit_eer(d0, gen, grid),
+        "Otsu": MF.fit_otsu(d0, gen, grid),
     }
     C.atomic_json(out / "fixed_thresholds.json", {"thresholds": fixed})
     for b in test:

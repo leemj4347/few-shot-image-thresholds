@@ -32,7 +32,7 @@ def main(args, out):
     regs = [(b, k, d) for b in test for k, d in b.reg.items()]
     if args.smoke:
         regs = regs[:60]
-    tau_h = MF.fit_C0h()
+    tau_h = MF.hash_convention_threshold()
     C.atomic_json(out / "hash_rule.json", {"tau_grid": tau_h})
     hrows = []
     for a in alphas:

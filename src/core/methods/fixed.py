@@ -38,17 +38,17 @@ def _pair_curves(d0: SIM.GridDist, gen: np.ndarray, grid: np.ndarray):
     return fpr, tpr
 
 
-def fit_C0eer(d0, gen, grid) -> float:
+def fit_eer(d0, gen, grid) -> float:
     fpr, tpr = _pair_curves(d0, gen, grid)
     return float(grid[int(np.argmin(np.abs(fpr - (1.0 - tpr))))])
 
 
-def fit_C0j(d0, gen, grid) -> float:
+def fit_youden(d0, gen, grid) -> float:
     fpr, tpr = _pair_curves(d0, gen, grid)
     return float(grid[int(np.argmax(tpr - fpr))])
 
 
-def fit_C0otsu(d0: SIM.GridDist, gen: np.ndarray, grid) -> float:
+def fit_otsu(d0: SIM.GridDist, gen: np.ndarray, grid) -> float:
     v = d0.v
     w0 = d0.c / max(d0.c.sum(), 1)
     gcnt = np.zeros_like(v)
@@ -70,5 +70,5 @@ def fit_C0otsu(d0: SIM.GridDist, gen: np.ndarray, grid) -> float:
     return float(v[i])
 
 
-def fit_C0h(w=None) -> float:
+def hash_convention_threshold(w=None) -> float:
     return SIM.grid_ceil(1.0 - HASH_CONVENTION_BITS / 64.0, w or SIM.W_FIXED)

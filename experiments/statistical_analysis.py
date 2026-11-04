@@ -133,9 +133,9 @@ def main(args, out):
             run = max(run, min(1.0, (m - i) * T.loc[idx, "p_value"]))
             adj[idx] = run
         T["p_holm"] = adj
-    C.save_csv(pd.DataFrame(ci_rows), out / "C1_bootstrap_ci.csv")
-    C.save_csv(pd.DataFrame(diff_rows), out / "C1_paired_differences_ci.csv")
-    C.save_csv(T, out / "C3_paired_tests.csv")
+    C.save_csv(pd.DataFrame(ci_rows), out / "bootstrap_ci.csv")
+    C.save_csv(pd.DataFrame(diff_rows), out / "paired_differences_ci.csv")
+    C.save_csv(T, out / "paired_tests.csv")
     return {"bootstrap_draws": B, "ci_rows": len(ci_rows), "tests": len(test_rows)}
 
 

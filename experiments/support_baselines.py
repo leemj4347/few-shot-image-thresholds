@@ -9,7 +9,7 @@ ALPHAS = (0.01, 0.05)
 MODE = "base_set"
 
 
-# Smallest k with P(Bin(N, 1-alpha) >= k) <= delta (Tong et al
+# NP rank from the binomial tail bound (Tong et al., 2018).
 def np_rank(N, alpha, delta=C.DELTA):
     beta = 1 - alpha
     k = int(binom.ppf(1 - delta, N, beta)) + 1

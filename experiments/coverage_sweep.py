@@ -44,7 +44,7 @@ def run_level(S, MF, a, test, fit, cal, dev, fixed, modes, seeds, arms, p):
         valid = [j for j in range(1, n + 1) if binom.sf(j - 1, n, beta) <= 0.05]
         k = min(valid) if valid else n + 1
         rows = []
-        tau_h = MF.fit_C0h()
+        tau_h = MF.hash_convention_threshold()
         for b in test:
             for kind, d in b.reg.items():
                 z = np.sort(d['Z_sup'][:n])

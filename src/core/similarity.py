@@ -131,17 +131,6 @@ class GridDist:
         return float(self.v[min(i + 1, len(self.v) - 1)]) if i < len(self.v) - 1 else float("inf")
 
 
-# Query false alarm rate under independence: 1 - F0(tau-)^M
-def far_iid(F0_left: float, M: int) -> float:
-    return 1.0 - F0_left ** M
-
-
-# Smallest grid value with 1 - F0(tau-)^M <= alpha
-def tau_iid(dist: GridDist, M: int, alpha: float) -> float:
-    need = (1.0 - alpha) ** (1.0 / M)
-    return dist.quantile_ge(need)
-
-
 def far_empirical(Z: np.ndarray, tau: float) -> float:
     return float(np.mean(Z >= tau)) if len(Z) else float("nan")
 

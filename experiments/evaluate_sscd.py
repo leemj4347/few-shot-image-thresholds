@@ -25,7 +25,7 @@ def curves(neg_by_dom, pos):
     return (cand, fpr, tpr)
 
 
-# Positives: S_gen of the photometric PRIMARY edits, the same set as methods.fixed (PHOTO) for DBpHash
+# Positives: S_gen of the photometric DBpHash reference edits, the same set as methods.fixed (PHOTO) for DBpHash
 def fixed_rules(dev, photo, smoke=False):
     neg = {}
     for b in dev:

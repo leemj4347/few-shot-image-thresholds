@@ -144,16 +144,16 @@ def run(args, out):
         assert (len(fit), len(cal), len(dev)) == (324, 324, 568), (len(fit), len(cal), len(dev))
         assert sum((len(b.reg) for b in test)) == 1016
     names = S.CR.variant_names()
-    tau_h = MF.fit_C0h(w)
+    tau_h = MF.hash_convention_threshold(w)
     C.prepare_test(test, tau_h, names)
     regs = [(b, k, d) for b in test for k, d in b.reg.items()]
 
     d0, gen = MF.dev_pair_scores(dev)
     fixed = {
         "Hash convention (10 bits)": tau_h,
-        "Youden J": MF.fit_C0j(d0, gen, g),
-        "Equal error rate": MF.fit_C0eer(d0, gen, g),
-        "Otsu": MF.fit_C0otsu(d0, gen, g),
+        "Youden J": MF.fit_youden(d0, gen, g),
+        "Equal error rate": MF.fit_eer(d0, gen, g),
+        "Otsu": MF.fit_otsu(d0, gen, g),
     }
     C.atomic_json(out / "fixed_thresholds.json", fixed)
     rows = []

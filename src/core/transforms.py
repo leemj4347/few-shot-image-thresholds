@@ -1,4 +1,4 @@
-# Secondary edit set (SECONDARY)
+# Image edits for registry evaluation
 from __future__ import annotations
 import os
 import numpy as np
@@ -156,7 +156,7 @@ def apply2(img_bgr: np.ndarray, name: str, rng: np.random.Generator) -> np.ndarr
     raise ValueError(fam)
 
 
-# (idx, root, rel, seed) -> hash rows of the SECONDARY edits
+# (idx, root, rel, seed) -> hash rows of the registry evaluation edits
 def variants2_one(args):
     import hashcache as HC
     import dbphash as D
