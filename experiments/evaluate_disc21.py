@@ -1,11 +1,10 @@
 # External test on the DISC21 ground truth
 from __future__ import annotations
-import json, zipfile, datetime
+import json, zipfile
 from pathlib import Path
 import numpy as np, pandas as pd
 from scipy.stats import binom
 import experiment as C
-from experiments.support_baselines import np_rank
 from experiments.prepare_disc21 import FeatStore, VAL_LIST, QZIP, GT
 NS = (100, 10)
 ALPHAS = (0.01, 0.05)

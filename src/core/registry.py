@@ -117,7 +117,6 @@ class Registry:
         if need <= 0: return self
         rng = np.random.default_rng((self.seed if seed is None else seed) + 104729)
         new_idx = cur.copy()
-        in_reg = set(new_idx.tolist())
         groups = sorted(set(pool.coll[cur])) if pool.has_coll else [None]
         for c in groups:
             if need <= 0: break
@@ -132,7 +131,6 @@ class Registry:
             drop = rng.choice(drop_pool, m, replace=False)
             add = rng.choice(cand, m, replace=False)
             new_idx = np.sort(np.concatenate([np.setdiff1d(new_idx, drop), add]))
-            in_reg = set(new_idx.tolist())
             need -= m
         if len(new_idx) != len(cur): return self
         return Registry(pool, new_idx, self.structure, self.seed, self.M_target, self.rule, self.exclude_coll)

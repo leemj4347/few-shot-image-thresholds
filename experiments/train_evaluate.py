@@ -1,6 +1,6 @@
 # Train predictors and evaluate threshold methods
 from __future__ import annotations
-import json, time
+import time
 import numpy as np, pandas as pd
 from scipy.stats import binom
 import experiment as C

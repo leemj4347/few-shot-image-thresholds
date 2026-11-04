@@ -238,8 +238,6 @@ def build_cache(dataset: str, root: str, out: str, list_file=None, meta_csv=None
              "mid_u64", "high_u64", "phash_u64", "w", "h", "ok"]]
     for c in ("mid_u64", "high_u64", "phash_u64"): df[c] = df[c].astype("uint64")
     df.to_parquet(out, index=False)
-    n_ok = int(df.ok.sum())
-    n_grp = df.loc[df.ok, "group_id"].nunique()
     return df
 
 

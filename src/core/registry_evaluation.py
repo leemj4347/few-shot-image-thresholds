@@ -45,16 +45,11 @@ def build_bundles(cfg: dict, root: Path, role_table: dict, scheme: str, log=prin
 
             M_list = cfg.get("train_M", d["M"]) if role == "train" else d["M"]
             structures=[st for st in d.get("structures", ["random"]) if st=="random" or rp.has_coll]
-            total_jobs=len(structures)*len(M_list)*len(cfg["seeds"])
-            done_jobs=0
-            invalid_jobs=0
             for struct in structures:
                 for M in M_list:
                     for seed in cfg["seeds"]:
 
                         b = T.build_bundle(rp, var, role, dom, struct, M, seed, cfg)
-                        done_jobs+=1
-                        if b.note:invalid_jobs+=1
 
                         if b.note:
                             invalid.append({"role": role, "domain": dom, "structure": struct,

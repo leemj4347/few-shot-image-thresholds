@@ -1,17 +1,19 @@
 # Predictor training, calibration and evaluation
 from pathlib import Path
-import os, sys, json, copy, hashlib, time, datetime, argparse, math, zipfile
+import sys, json, copy, math
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 SRC = HERE / "core"
 sys.path[:0] = [str(SRC), str(SRC)]
-import numpy as np, pandas as pd, torch
+import numpy as np, torch
 from torch import nn
 from fractions import Fraction
-from scipy.stats import binom, t
+from scipy.stats import binom
 import task_io as X, registry_evaluation as R
 import similarity as SIM, evaluate_registry as EV, criteria as CR
 from methods import conditional_predictor as F, calibration as FC
+
+__all__ = ["R", "SIM", "EV", "CR"]
 torch.set_num_threads(1)
 CACHE = ROOT / "models"
 _CREATED_MODELS = set()

@@ -1,6 +1,6 @@
 # Recompute image hashes using deterministic edits
 from __future__ import annotations
-import json, os, shutil, datetime
+import os, shutil, datetime
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 import numpy as np, pandas as pd
@@ -71,8 +71,6 @@ def rehash_one(name, root, dest, parts, p, ex, smoke):
     pdir = C.output_path(parts / name)
     pdir.mkdir(parents=True, exist_ok=True)
     todo = [i for i in range(len(chunks)) if not (pdir / f"part_{i:05d}.npz").exists()]
-    tset = set(todo)
-    done_rows = sum(len(by_file[f]) for i in range(len(chunks)) if i not in tset for f in chunks[i])
 
     futures = {ex.submit(work, (str(root), [(f, by_file[f]) for f in chunks[i]])): i for i in todo}
     from concurrent.futures import as_completed

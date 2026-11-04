@@ -8,7 +8,6 @@ import torch
 from torch import nn
 from .author_source import load_deepset
 from . import statmlp as SUMMARY
-import similarity as SIM
 HIDDEN = 256
 EPOCHS = 15
 SOURCE = Path(__file__).resolve().parents[3] / "external/fisch/mini_imagenet/quantile_snn.py"

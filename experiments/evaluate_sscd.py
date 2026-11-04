@@ -1,6 +1,5 @@
 # Train, calibrate and evaluate on SSCD scores
 from __future__ import annotations
-import json, datetime
 import numpy as np, pandas as pd
 from scipy.stats import binom
 import experiment as C

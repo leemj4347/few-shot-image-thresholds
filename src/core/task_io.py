@@ -1,13 +1,9 @@
 # Load task manifests and cached bundles
 from pathlib import Path
-import sys, json, hashlib, time, datetime, threading, os, copy, argparse
-import numpy as np
-import pandas as pd
+import sys, json, time, os, copy
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import tasks as T
-import criteria as CR
-import evaluate_registry as EV
 import registry_evaluation as R
 from methods import conditional_predictor as F
 from task_builder import sha, read_json

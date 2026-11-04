@@ -1,6 +1,5 @@
 # Dual-band perceptual image hashing
 from __future__ import annotations
-import io
 import numpy as np
 import cv2
 from PIL import Image

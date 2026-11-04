@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, os, time
+import time
 import numpy as np, pandas as pd
 from scipy.stats import binom
 import experiment as C
@@ -127,8 +127,6 @@ def main(args, out):
     arms = C.output_path(out / 'arms')
     arms.mkdir(parents=True, exist_ok=True)
     mroot = C.OUT_ROOT / 'models_coverage_smoke' if args.smoke else C.ROOT / 'models_coverage'
-    name = 'coverage' + ('' if what != 'part' else '_p' + args.part.replace('/', 'of'))
-    L = 0 if what == 'aggregate' else len(todo)
 
     if what != 'aggregate':
         fit, cal, dev, test, fixed = F2.prepare(S, None, out)

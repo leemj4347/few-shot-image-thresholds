@@ -38,7 +38,7 @@ def main(args, out):
         if not all(d[c].dtype == np.uint64 for c in d): raise TypeError("hash cache is not uint64")
     if args.smoke:
         return None
-    S = C.runner()
+    C.runner()
     import task_builder as RF
     ref = C.REFERENCE
     status = json.loads((ref / "reference_manifest.json").read_text(encoding="utf-8")).get("status") if (ref / "reference_manifest.json").exists() else None
