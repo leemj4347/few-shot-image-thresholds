@@ -49,15 +49,6 @@ def corrected_boundary(q, lam):
     return _ceil_float(Fraction.from_float(q) + Fraction.from_float(lam))
 
 
-def cdf_at(scores, v):
-    z = np.asarray(scores, dtype=np.float64)
-    if z.ndim != 1 or not len(z) or (not np.isfinite(z).all()):
-        raise ValueError("nonempty finite 1-D scores required")
-    if np.isnan(v):
-        raise ValueError("NaN boundary")
-    return float(np.count_nonzero(z <= v) / len(z))
-
-
 def calibrate_predictions(rows, alpha):
     L = len(rows)
     b = beta_fraction(alpha)

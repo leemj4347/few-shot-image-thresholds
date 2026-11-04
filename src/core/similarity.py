@@ -47,11 +47,6 @@ def sim_from_dist(dm: np.ndarray, dh: np.ndarray, w: dict=W_FIXED) -> np.ndarray
     return w["mid"] * (1.0 - dm.astype(np.float64) / NB) + w["high"] * (1.0 - dh.astype(np.float64) / NB)
 
 
-def sim_matrix(qm, qh, rm, rh, w: dict=W_FIXED) -> np.ndarray:
-    dm, dh = dist_pairs(qm, qh, rm, rh)
-    return sim_from_dist(dm, dh, w)
-
-
 # Query chunk size (rows)
 def auto_chunk(M: int, budget_elems: int=4000000) -> int:
     return int(max(1, min(256, budget_elems // max(M, 1))))

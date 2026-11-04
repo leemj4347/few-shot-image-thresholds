@@ -23,10 +23,6 @@ MODES = {"base_set": 256, "base_summary256": 256}
 PARAMETERS = {"base_set": 198401, "base_summary256": 68353}
 
 
-def feature_names(mode):
-    return (["score_set"] if mode.endswith("_set") else SUMMARY.FEATURES[:7]) + ["log10M"]
-
-
 def context(mode, n, M, domain, hist):
     if mode not in MODES:
         raise ValueError(f"Unknown model mode: {mode}")

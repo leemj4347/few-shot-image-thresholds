@@ -1,6 +1,5 @@
 # Role splits and per-task score bundles
 from __future__ import annotations
-import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 import numpy as np
@@ -15,32 +14,11 @@ N_EVAL = 299
 ROLES = ("train", "dev", "test")
 
 
-def _stable_bucket(key: str, salt: str, k: int) -> int:
-    return int(hashlib.sha256((salt + "|" + str(key)).encode("utf-8")).hexdigest()[:8], 16) % k
-
-
 # Unit of the role split
 def split_keys(pool: Pool) -> np.ndarray:
     coll = pool.coll.astype(object)
     gid = pool.df.group_id.to_numpy()
     return np.array([c if c else ("__grp__" + str(g)) for c, g in zip(coll, gid)], dtype=object)
-
-
-ROLE_SHARE = {"train": 0.4, "dev": 0.3, "test": 0.3}
-
-
-# Split meta-training/development/test 4:3:3 by collection (pixel group if absent)
-def role_split(pool: Pool, salt: str = "phase1-role-2026") -> dict:
-    keys, counts = np.unique(split_keys(pool), return_counts=True)
-    h = {k: hashlib.sha256((salt + "|" + str(k)).encode("utf-8")).hexdigest() for k in keys}
-    order = sorted(zip(keys, counts), key=lambda kc: (-int(kc[1]), h[kc[0]]))
-    out = {r: set() for r in ROLES}
-    size = {r: 0 for r in ROLES}
-    for k, c in order:
-        r = min(ROLES, key=lambda r: (size[r] / ROLE_SHARE[r], ROLES.index(r)))
-        out[r].add(k)
-        size[r] += int(c)
-    return out
 
 
 # Pool restricted to one role
@@ -264,18 +242,6 @@ def load_bundle(path: Path) -> Bundle:
                        "Z_pos": z[f"{kind}|Z_pos"], "pos_variant": z[f"{kind}|pos_variant"],
                        "hist_sup": {int(n): z[f"{kind}|hist|{n}"] for n in km["hist_n"]}}
     return b
-
-
-# Bundle summary (diagnostic)
-def bundle_rows(b: Bundle) -> list[dict]:
-    out = []
-    for kind, d in b.reg.items():
-        out.append({"role": b.role, "domain": b.domain, "structure": b.structure, "M": b.M, "seed": b.seed,
-                    "scheme": b.scheme, "kind": kind, "M_eff": d["M"], "n_coll": d["n_coll"],
-                    "n_sup": b.n_sup, "n_eval": b.n_eval, "n_pos_orig": d["n_pos_orig"],
-                    "Z_eval_max": float(d["Z_eval"].max()) if len(d["Z_eval"]) else np.nan,
-                    "Z_sup_max": float(d["Z_sup"].max()) if len(d["Z_sup"]) else np.nan})
-    return out
 
 
 # Role table -> {key: role}

@@ -1,32 +1,22 @@
 # Image edits for registry evaluation
 from __future__ import annotations
-import os
 import numpy as np
 import cv2
 
 
-SPEC_V2 = [
-    ("gauss_s05",  "gaussian", {"sigma": 0.05}),
-    ("gauss_s10",  "gaussian", {"sigma": 0.10}),
-    ("gauss_s20",  "gaussian", {"sigma": 0.20}),
-    ("jpeg_q05",   "jpeg",     {"q": 5}),
-    ("jpeg_q02",   "jpeg",     {"q": 2}),
-    ("median_k05", "median",   {"k": 5}),
-    ("median_k09", "median",   {"k": 9}),
-    ("scale_f075", "scale",    {"f": 0.75}),
-    ("scale_f050", "scale",    {"f": 0.50}),
-    ("scale_f025", "scale",    {"f": 0.25}),
-    ("rotate_d01", "rotate",   {"deg": 1.0}),
-    ("rotate_d03", "rotate",   {"deg": 3.0}),
-    ("rotate_d10", "rotate",   {"deg": 10.0}),
-    ("crop_f090",  "crop",     {"f": 0.90}),
-    ("crop_f080",  "crop",     {"f": 0.80}),
-    ("gamma_g080", "gamma",    {"g": 0.80}),
-    ("gamma_g125", "gamma",    {"g": 1.25}),
-]
-
-
-SPEC_V3_NEW = [
+# The 23 edits evaluated in the experiments
+EDITS = [
+    ("gauss_s05",     "gaussian", {"sigma": 0.05}),
+    ("gauss_s10",     "gaussian", {"sigma": 0.10}),
+    ("gauss_s20",     "gaussian", {"sigma": 0.20}),
+    ("jpeg_q05",      "jpeg",     {"q": 5}),
+    ("jpeg_q02",      "jpeg",     {"q": 2}),
+    ("median_k05",    "median",   {"k": 5}),
+    ("median_k09",    "median",   {"k": 9}),
+    ("rotate_d01",    "rotate",   {"deg": 1.0}),
+    ("rotate_d03",    "rotate",   {"deg": 3.0}),
+    ("gamma_g080",    "gamma",    {"g": 0.80}),
+    ("gamma_g125",    "gamma",    {"g": 1.25}),
     ("resize_f075",   "resize",   {"f": 0.75}),
     ("resize_f050",   "resize",   {"f": 0.50}),
     ("cropkeep_f098", "cropkeep", {"f": 0.98}),
@@ -41,29 +31,17 @@ SPEC_V3_NEW = [
     ("text_s10",      "text",     {"scale": 1.0}),
 ]
 
-SPEC_V3_KEPT = [s for s in SPEC_V2 if s[0] in
-                ("gauss_s05", "gauss_s10", "gauss_s20", "jpeg_q05", "jpeg_q02",
-                 "median_k05", "median_k09", "gamma_g080", "gamma_g125", "rotate_d01", "rotate_d03")]
-SPEC_V3 = SPEC_V3_KEPT + SPEC_V3_NEW
+# Edits retained for cache recomputation; excluded from the 23-edit mean TPR
+CACHE_ONLY_EDITS = [
+    ("scale_f075", "scale",  {"f": 0.75}),
+    ("scale_f050", "scale",  {"f": 0.50}),
+    ("scale_f025", "scale",  {"f": 0.25}),
+    ("rotate_d10", "rotate", {"deg": 10.0}),
+    ("crop_f090",  "crop",   {"f": 0.90}),
+    ("crop_f080",  "crop",   {"f": 0.80}),
+]
 
-
-SPEC_CHOICE = os.environ.get("ATTACKS2_SPEC", "v3").lower()
-SPEC = {"v2": SPEC_V2, "v3": SPEC_V3}[SPEC_CHOICE]
-_ALL = SPEC_V2 + SPEC_V3_NEW
-NAMES = [s[0] for s in SPEC]
-BY_NAME = {s[0]: s for s in _ALL}
-
-
-PHOTOMETRIC2 = [n for n, f, _ in _ALL if f in ("gaussian", "jpeg", "median", "gamma", "text")]
-GEOMETRIC2 = [n for n, f, _ in _ALL if f in ("scale", "rotate", "crop", "resize", "cropkeep",
-                                             "shift", "padedge", "rotkeep")]
-
-REFRAMING = [n for n, f, _ in _ALL if f in ("scale", "crop", "rotate", "padedge")]
-CONTENT_PRESERVING = [n for n, f, _ in _ALL if f in ("resize", "cropkeep", "shift", "rotkeep", "text")]
-
-SPEC_VERSIONS = {"v2": "17 edits",
-                 "v3": "23 edits"}
-SPEC_VERSION = SPEC_VERSIONS[SPEC_CHOICE]
+BY_NAME = {s[0]: s for s in EDITS + CACHE_ONLY_EDITS}
 
 
 # Edited image for one edit name
@@ -154,22 +132,3 @@ def apply2(img_bgr: np.ndarray, name: str, rng: np.random.Generator) -> np.ndarr
         return np.clip(x * 255.0 + 0.5, 0, 255).astype(np.uint8)
 
     raise ValueError(fam)
-
-
-# (idx, root, rel, seed) -> hash rows of the registry evaluation edits
-def variants2_one(args):
-    import hashcache as HC
-    import dbphash as D
-    idx, root, rel, seed = args
-    img = HC.load_bgr(os.path.join(root, rel))
-    if img is None:
-        return []
-    rows = []
-    for name in NAMES:
-        rng = np.random.default_rng(seed)
-        v = apply2(img, name, rng)
-        hsh = D.dbphash(v, HC.CFG["bands"], HC.CFG["interp"])
-        rows.append({"file": rel.replace("\\", "/"), "variant": name,
-                     "mid_u64": HC.bits_to_u64(hsh["mid"]), "high_u64": HC.bits_to_u64(hsh["high"]),
-                     "phash_u64": HC.bits_to_u64(HC.phash_bits(v))})
-    return rows
