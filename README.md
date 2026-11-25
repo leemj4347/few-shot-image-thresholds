@@ -27,6 +27,14 @@ python analysis/recalculate_ablation.py --data /path/to/results/ABL --main-data 
 
 The `--main-data` directory is the numerical archive above. It supplies the proposed predictor, H256 and Z-norm reference rows for the combined table.
 
+## Calibration task counts
+
+Download [calibration-size-results.zip](https://github.com/leemj4347/few-shot-image-thresholds/releases/download/calibration-size/calibration-size-results.zip) and extract it. Results use 100 support queries, calibration task counts of 59–324, and five training seeds.
+
+```shell
+python analysis/recalculate_calibration_size.py --data /path/to/results/calibration_size/calsize_runs.csv --output /path/to/calibration-size-summary
+```
+
 ## Image experiments
 
 ```powershell
@@ -43,6 +51,7 @@ Individual stages and additional analyses:
 ```powershell
 ./run_step.ps1 -Step main
 ./run_step.ps1 -Step ablation
+./run_step.ps1 -Step calibration_size
 ./run_analysis.ps1
 ```
 

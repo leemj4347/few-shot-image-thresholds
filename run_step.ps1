@@ -1,5 +1,5 @@
 param(
- [Parameter(Mandatory=$true)][ValidateSet('hashes','tasks','main','ablation','hash_thresholds','support_baselines','edit_detection','statistics','residuals','phash_build','phash','sscd_download','sscd_embeddings','sscd_build','sscd','disc21_prepare','disc21','coverage')][string]$Step,
+ [Parameter(Mandatory=$true)][ValidateSet('hashes','tasks','main','ablation','calibration_size','hash_thresholds','support_baselines','edit_detection','statistics','residuals','phash_build','phash','sscd_download','sscd_embeddings','sscd_build','sscd','disc21_prepare','disc21','coverage')][string]$Step,
  [switch]$Smoke,
  [string]$Part = '',
  [int]$Workers = 0,
@@ -17,7 +17,7 @@ $env:WORKERS = "$Workers"
 $env:OMP_NUM_THREADS = '1'; $env:OPENBLAS_NUM_THREADS = '1'; $env:MKL_NUM_THREADS = '1'
 try { (Get-Process -Id $PID).PriorityClass = 'BelowNormal' } catch { }
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$map = @{ hashes='experiments/compute_hashes.py'; tasks='experiments/build_tasks.py'; main='experiments/train_evaluate.py'; ablation='experiments/s16_ablation.py';
+$map = @{ hashes='experiments/compute_hashes.py'; tasks='experiments/build_tasks.py'; main='experiments/train_evaluate.py'; ablation='experiments/s16_ablation.py'; calibration_size='experiments/calibration_size.py';
           hash_thresholds='experiments/hash_thresholds.py'; support_baselines='experiments/support_baselines.py'; edit_detection='experiments/edit_detection.py'; statistics='experiments/statistical_analysis.py'; residuals='experiments/residual_analysis.py';
           phash_build='experiments/phash.py'; phash='experiments/phash.py';
           sscd_download='experiments/download_sscd.py'; sscd_embeddings='experiments/embed_sscd.py'; sscd_build='experiments/build_sscd_tasks.py'; sscd='experiments/evaluate_sscd.py';

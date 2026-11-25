@@ -1,4 +1,3 @@
-# Predictor input ablations and calibration comparisons
 from __future__ import annotations
 
 import numpy as np
