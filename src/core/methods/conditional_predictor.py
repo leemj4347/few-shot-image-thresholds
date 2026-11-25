@@ -19,8 +19,8 @@ COMMIT = "bcd18d1726541da827f7530a724460bd735bc0ed"
 def source_class():
     return load_deepset(SOURCE, HASH_FILE)
 INPUTS = {"base": 1}
-MODES = {"base_set": 256, "base_summary256": 256}
-PARAMETERS = {"base_set": 198401, "base_summary256": 68353}
+MODES = {"base_set": 256, "base_summary256": 256, "set_plain": 256}
+PARAMETERS = {"base_set": 198401, "base_summary256": 68353, "set_plain": 198145}
 
 
 def context(mode, n, M, domain, hist):
@@ -56,11 +56,12 @@ class ConditionalSet(nn.Module):
 def make_head(mode, hidden):
     if mode not in MODES or hidden != MODES[mode]:
         raise ValueError(f"Expected hidden width {MODES.get(mode)} for mode {mode!r}; got {hidden}")
-    variant, arch = mode.split("_", 1)
-    c = INPUTS[variant]
     cls, _ = source_class()
     head = cls(argparse.Namespace(set_hidden_size=int(hidden)))
-    if arch == "set":
+    if mode == "set_plain":
+        out = head
+    elif mode.endswith("_set"):
+        c = INPUTS[mode.split("_", 1)[0]]
         out = ConditionalSet(head, c)
     else:
         out = copy.deepcopy(head.combiner)
@@ -77,6 +78,8 @@ def encode_input(z, n, M, alpha, mode, domain=None, hist=None):
         raise ValueError("Require 100 normal query scores")
     if not np.isfinite(M) or M < 1 or int(M) != M:
         raise ValueError("Invalid actual M")
+    if mode == "set_plain":
+        return z[:n, None]
     c = context(mode, n, M, domain, hist)
     if mode.endswith("_set"):
         return np.column_stack((z[:n], np.tile(c, (n, 1))))

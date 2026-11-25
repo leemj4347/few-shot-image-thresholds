@@ -17,6 +17,16 @@ The output contains condition summaries, registry FAR order statistics, edit-wis
 
 The archive contains evaluation measurements. It supports recalculation of the reported numerical analyses, rather than model retraining or image-score generation.
 
+## Predictor ablations
+
+Download [ablation-results.zip](https://github.com/leemj4347/few-shot-image-thresholds/releases/download/predictor-ablations/ablation-results.zip) and extract it. It contains registry-level results for three input variants, both calibration rules, four support sizes, three nominal levels and five seeds; model weights are not included.
+
+```shell
+python analysis/recalculate_ablation.py --data /path/to/results/ABL --main-data /path/to/metrics --output /path/to/ablation-summary
+```
+
+The `--main-data` directory is the numerical archive above. It supplies the proposed predictor, H256 and Z-norm reference rows for the combined table.
+
 ## Image experiments
 
 ```powershell
@@ -32,6 +42,7 @@ Individual stages and additional analyses:
 
 ```powershell
 ./run_step.ps1 -Step main
+./run_step.ps1 -Step ablation
 ./run_analysis.ps1
 ```
 

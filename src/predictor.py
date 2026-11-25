@@ -44,10 +44,11 @@ class Predictor(nn.Module):
 
     def forward(self, x):
         v = (x - self.mu) / self.sd
-        if self.mode.endswith("_set"):
+        if self.mode.endswith("_set") or self.mode == "set_plain":
             e = self.head.embedder(v[:, :, :1])
             h = e.mean(1)
-            h = torch.cat((h, v[:, 0, 1:]), 1)
+            if self.mode != "set_plain":
+                h = torch.cat((h, v[:, 0, 1:]), 1)
             y = self.head.combiner(h).reshape(-1)
         else:
             y = self.head(v).reshape(-1)
@@ -66,7 +67,7 @@ def arrays(bs, alpha, mode):
 
 
 def normalize(x, mode):
-    if mode.endswith("_set"):
+    if mode.endswith("_set") or mode == "set_plain":
         mu = torch.zeros(x.shape[-1])
         sd = torch.ones(x.shape[-1])
         mu[0] = x[:, :, 0].mean()
